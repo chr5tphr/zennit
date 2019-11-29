@@ -1,3 +1,29 @@
+# IDEs and Code editors
+.vscode
+.idea
+.venv
+.exrc
+
+# Python output
+.python
 *.egg-info
-/.python
-**/__pycache__
+__pycache__
+
+# Setup output
+build/
+dist/
+
+# Results output
+result
+
+# Testing
+.tox
+.coverage
+.coverage.*
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# NPM dependencies
+node_modules
