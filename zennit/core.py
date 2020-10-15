@@ -131,16 +131,20 @@ class LinearHook(Hook):
     param_modifiers: list of function
         A list of functions to temporarily modify the parameters of the attached linear layer for each input produced
         with `input_modifiers`.
-    stabilizer: function
-        Function to stabilize the output of each modified forward pass before devision.
+    gradient_mapper: function
+        Function to modify upper relevance. Call signature is of form `(grad_output, outputs)` and a tuple of
+        the same size as outputs is expected to be returned. `outputs` has the same size as `input_modifiers` and
+        `param_modifiers`.
     reducer: function
-        Function to accumulate all the outputs produced through `input_modifiers` and `param_modifiers`
+        Function to reduce all the inputs and gradients produced through `input_modifiers` and `param_modifiers`.
+        Call signature is of form `(inputs, gradients)`, where `inputs` and `gradients` have the same as
+        `input_modifiers` and `param_modifiers`
     '''
-    def __init__(self, input_modifiers, param_modifiers, stabilizer, reducer):
+    def __init__(self, input_modifiers, param_modifiers, gradient_mapper, reducer):
         self.input_modifiers = input_modifiers
         self.param_modifiers = param_modifiers
+        self.gradient_mapper = gradient_mapper
         self.reducer = reducer
-        self.stabilizer = stabilizer
 
         self.input = None
         self.output = None
@@ -152,11 +156,13 @@ class LinearHook(Hook):
 
     def backward(self, module, grad_input, grad_output):
         '''Backward hook to compute LRP based on the class attributes.'''
-        accumulated = []
+        inputs = []
+        outputs = []
         for in_mod, param_mod in zip(self.input_modifiers, self.param_modifiers):
             input = in_mod(self.input[0].detach()).requires_grad_()
             with mod_params(module, param_mod) as modified:
                 output = modified.forward(input)
-            grad, = torch.autograd.grad(output, input, grad_outputs=grad_output / self.stabilizer(output))
-            accumulated.append(output * grad)
-        return self.reducer(accumulated)
+            inputs.append(input)
+            outputs.append(output)
+        gradients = torch.autograd.grad(inputs, outputs, grad_outputs=self.gradient_mapper(grad_output, outputs))
+        return self.reducer(inputs, gradients)
