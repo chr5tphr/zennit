@@ -165,4 +165,4 @@ class LinearHook(Hook):
             inputs.append(input)
             outputs.append(output)
         gradients = torch.autograd.grad(inputs, outputs, grad_outputs=self.gradient_mapper(grad_output, outputs))
-        return self.reducer(inputs, gradients)
+        return self.reducer([input.detach_() for input in inputs], [gradient.detach_() for gradient in gradients])

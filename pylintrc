@@ -148,6 +148,7 @@ disable=print-statement,
         redefined-outer-name,
         abstract-method,
         too-many-public-methods,
+        redefined-builtin,
 
 
 
