@@ -1,9 +1,11 @@
 '''Rules based on Hooks'''
-from .core import LinearHook, stabilize
+import torch
+
+from .core import Hook, LinearHook, stabilize
 
 
 class Epsilon(LinearHook):
-    '''LRP Epsilon Rule
+    '''Epsilon LRP rule.
 
     Parameters
     ----------
@@ -20,7 +22,7 @@ class Epsilon(LinearHook):
 
 
 class Gamma(LinearHook):
-    '''LRP Gamma Rule
+    '''Gamma LRP rule.
 
     Parameters
     ----------
@@ -37,7 +39,7 @@ class Gamma(LinearHook):
 
 
 class ZPlus(LinearHook):
-    '''LRP ZPlus (or alpha=1, beta=1) Rule.'''
+    '''ZPlus (or alpha=1, beta=0) LRP rule.'''
     def __init__(self):
         super().__init__(
             input_modifiers=[lambda input: input],
@@ -48,7 +50,7 @@ class ZPlus(LinearHook):
 
 
 class AlphaBeta(LinearHook):
-    '''AlphaBeta LRP Rule.
+    '''AlphaBeta LRP rule.
 
     Parameters
     ----------
@@ -70,7 +72,7 @@ class AlphaBeta(LinearHook):
 
 
 class ZBox(LinearHook):
-    '''ZBox LRP Rule for input pixel space.
+    '''ZBox LRP rule for input pixel space.
 
     Parameters
     ----------
@@ -96,4 +98,50 @@ class ZBox(LinearHook):
             ],
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(sub(*outputs))] * 3),
             reducer=(lambda inputs, gradients: sub(*(input * gradient for input, gradient in zip(inputs, gradients))))
+        )
+
+
+class Pass(Hook):
+    '''If the rule of a layer shall not be any other, is elementwise and shall not be the gradient, the `Pass` rule
+    simply passes upper layer relevance through to the lower layer.
+    '''
+    def backward(self, module, grad_input, grad_output):
+        '''Pass through the upper gradient, skipping the one for this layer.'''
+        return grad_output
+
+
+class Norm(LinearHook):
+    '''Normalize and weigh relevance by input contribution.
+    This is essentially the same as the LRP Epsilon Rule with a fixed epsilon only used as a stabilizer, and without
+    the need of the attached layer to have parameters `weight` and `bias`.
+    '''
+    def __init__(self):
+        super().__init__(
+            input_modifiers=[lambda input: input],
+            param_modifiers=[None],
+            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
+            reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
+        )
+
+
+class WSquare(LinearHook):
+    '''This is the WSquare LRP rule.'''
+    def __init__(self):
+        super().__init__(
+            input_modifiers=[torch.ones_like],
+            param_modifiers=[lambda param: param ** 2],
+            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
+            reducer=(lambda inputs, gradients: gradients[0])
+        )
+
+
+class Flat(LinearHook):
+    '''This is the Flat LRP rule. It is essentially the same as the WSquare Rule, but with all parameters set to ones.
+    '''
+    def __init__(self):
+        super().__init__(
+            input_modifiers=[torch.ones_like],
+            param_modifiers=[torch.ones_like],
+            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
+            reducer=(lambda inputs, gradients: gradients[0])
         )
