@@ -189,8 +189,9 @@ class Preset:
 
     Parameters
     ----------
-    module_map: list[tuple[tuple[type, ...], Hook]]
-        A mapping from possible module types to Hooks that shall be applied to instances of said hooks.
+    module_map: list[function, Hook]]
+        A mapping from functions that check applicability of hooks to hooks that shall be applied to instances of
+        applicable hooks.
     canonizers: list[Canonizer]
         List of canonizers to be applied before applying hooks.
     '''
@@ -215,12 +216,12 @@ class Preset:
         for canonizer in self.canonizers:
             self.handles.append(canonizer(module))
 
-        for leaf in collect_leaves(module):
-            for types, hook_template in self.module_map:
-                if isinstance(leaf, types):
+        for name, child in module.named_modules():
+            for applicable, hook_template in self.module_map:
+                if applicable(name, child):
                     hook = hook_template.copy()
-                    self.handles.append(leaf.register_forward_hook(hook.forward))
-                    self.handles.append(leaf.register_backward_hook(hook.backward))
+                    self.handles.append(child.register_forward_hook(hook.forward))
+                    self.handles.append(child.register_backward_hook(hook.backward))
 
     def remove(self):
         '''Remove all handles for hooks and canonizers.
