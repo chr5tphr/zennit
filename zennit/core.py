@@ -90,6 +90,12 @@ class Hook:
     def backward(self, module, grad_input, grad_output):
         '''Hook applied during backward-pass'''
 
+    def copy(self):
+        '''Return a copy of this hook.
+        This is used to describe hooks of different modules by a single hook instance.
+        '''
+        return self.__class__()
+
 
 class LinearHook(Hook):
     '''A hook to compute the layerwise attribution of the layer it is attached to.
@@ -138,3 +144,9 @@ class LinearHook(Hook):
             outputs.append(output)
         gradients = torch.autograd.grad(inputs, outputs, grad_outputs=self.gradient_mapper(grad_output, outputs))
         return self.reducer([input.detach_() for input in inputs], [gradient.detach_() for gradient in gradients])
+
+    def copy(self):
+        '''Return a copy of this hook.
+        This is used to describe hooks of different modules by a single hook instance.
+        '''
+        return self.__class__(self.input_modifiers, self.param_modifiers, self.gradient_mapper, self.reducer)
