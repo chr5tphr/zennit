@@ -11,6 +11,7 @@ def register_preset(name):
         '''Wrapped function to be called on the preset to register it to the global PRESETS dict.'''
         PRESETS[name] = preset
         return preset
+    return wrapped
 
 
 class RemovableHandleList(list):
