@@ -216,8 +216,9 @@ class Preset:
         for canonizer in self.canonizers:
             self.handles += canonizer.apply(module)
 
+        ctx = {}
         for name, child in module.named_modules():
-            template = self.module_map(name, child)
+            template = self.module_map(ctx, name, child)
             if template is not None:
                 hook = template.copy()
                 self.handles.append(child.register_forward_hook(hook.forward))

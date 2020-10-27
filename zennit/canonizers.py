@@ -4,6 +4,7 @@ from abc import ABCMeta, abstractmethod
 import torch
 
 from .core import collect_leaves
+from .types import Linear, BatchNorm
 
 
 class Canonizer(metaclass=ABCMeta):
@@ -47,18 +48,10 @@ class MergeBatchNorm(Canonizer):
         Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and `eps`
     '''
     linear_type = (
-        torch.nn.modules.conv.Conv1d,
-        torch.nn.modules.conv.Conv2d,
-        torch.nn.modules.conv.Conv3d,
-        torch.nn.modules.conv.ConvTranspose1d,
-        torch.nn.modules.conv.ConvTranspose2d,
-        torch.nn.modules.conv.ConvTranspose3d,
-        torch.nn.modules.linear.Linear,
+        Linear,
     )
     batch_norm_type = (
-        torch.nn.modules.batchnorm.BatchNorm1d,
-        torch.nn.modules.batchnorm.BatchNorm2d,
-        torch.nn.modules.batchnorm.BatchNorm3d,
+        BatchNorm,
     )
 
     def __init__(self, linear, batch_norm):
