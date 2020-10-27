@@ -1,15 +1,18 @@
 '''Functions to produce a canonical form of models fit for LRP'''
+from abc import ABCMeta, abstractmethod
+
 import torch
 
 from .core import collect_leaves
 
 
-class Canonizer:
+class Canonizer(metaclass=ABCMeta):
     '''Canonizer Base class.
     Canonizers modify modules temporarily such that certain attribution rules can properly be applied.
     '''
     @classmethod
-    def apply(clss, module):
+    @abstractmethod
+    def apply(cls, module):
         '''Apply this canonizer recursively on all applicable modules.
 
         Parameters
@@ -24,9 +27,11 @@ class Canonizer:
         '''
         return []
 
+    @abstractmethod
     def register(self):
         '''Apply the changes of this canonizer.'''
 
+    @abstractmethod
     def remove(self):
         '''Revert the changes introduces by this canonizer.'''
 
@@ -42,12 +47,20 @@ class MergeBatchNorm(Canonizer):
         Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and `eps`
     '''
     linear_type = (
-        torch.nn.modules.conv._ConvNd,
-        torch.nn.modules.linear.linear,
+        torch.nn.modules.conv.Conv1d,
+        torch.nn.modules.conv.Conv2d,
+        torch.nn.modules.conv.Conv3d,
+        torch.nn.modules.conv.ConvTranspose1d,
+        torch.nn.modules.conv.ConvTranspose2d,
+        torch.nn.modules.conv.ConvTranspose3d,
+        torch.nn.modules.linear.Linear,
     )
     batch_norm_type = (
-        torch.nn.modules._BatchNorm,
+        torch.nn.modules.batchnorm.BatchNorm1d,
+        torch.nn.modules.batchnorm.BatchNorm2d,
+        torch.nn.modules.batchnorm.BatchNorm3d,
     )
+
     def __init__(self, linear, batch_norm):
         self.linear = linear
         self.batch_norm = batch_norm
@@ -64,14 +77,14 @@ class MergeBatchNorm(Canonizer):
 
     def register(self):
         '''Store the parameters of the linear and the batch norm modules and apply the merge.'''
-        self.linear_weight = linear.weight.data
-        if linear.bias is not None:
-            self.linear_bias = linear.bias.data
+        self.linear_weight = self.linear.weight.data
+        if self.linear.bias is not None:
+            self.linear_bias = self.linear.bias.data
 
-        self.weight = batch_norm.weight.data
-        self.bias = batch_norm.bias.data
-        self.running_mean = batch_norm.running_mean.data
-        self.running_var = batch_norm.running_var.data
+        self.weight = self.batch_norm.weight.data
+        self.bias = self.batch_norm.bias.data
+        self.running_mean = self.batch_norm.running_mean.data
+        self.running_var = self.batch_norm.running_var.data
 
         self.merge_batch_norm(self.linear, self.batch_norm)
 
@@ -91,7 +104,7 @@ class MergeBatchNorm(Canonizer):
         self.batch_norm.running_var.data = self.running_var
 
     @classmethod
-    def apply(clss, module):
+    def apply(cls, module):
         '''Finds a batch norm following right after a linear layer, and creates an instance of this class to merge
         them by fusing the batch norm parameters into the linear layer and reducing the batch norm to the identity.
 
@@ -109,8 +122,8 @@ class MergeBatchNorm(Canonizer):
         instances = []
         last_leaf = None
         for leaf in collect_leaves(module):
-            if isinstance(last_leaf, clss.linear_type) and isinstance(leaf, clss.batch_norm_type):
-                instances.append(clss(last_leaf, leaf))
+            if isinstance(last_leaf, cls.linear_type) and isinstance(leaf, cls.batch_norm_type):
+                instances.append(cls(last_leaf, leaf))
             last_leaf = leaf
 
         return instances
@@ -125,7 +138,8 @@ class MergeBatchNorm(Canonizer):
         module: obj:`torch.nn.Module`
             Linear layer with mandatory attributes `weight` and `bias`.
         batch_norm: obj:`torch.nn.Module`
-            Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and `eps`
+            Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and
+            `eps`
         '''
         original_weight = module.weight.data
         if module.bias is None:
