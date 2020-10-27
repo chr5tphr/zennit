@@ -190,10 +190,10 @@ class Preset:
     Parameters
     ----------
     module_map: list[function, Hook]]
-        A mapping from functions that check applicability of hooks to hooks that shall be applied to instances of
-        applicable hooks.
+        A mapping from functions that check applicability of hooks to hook instances that shall be applied to instances
+        of applicable modules.
     canonizers: list[Canonizer]
-        List of canonizers to be applied before applying hooks.
+        List of canonizer types to be applied before applying hooks.
     '''
     def __init__(self, module_map=None, canonizers=None):
         self.module_map = module_map
@@ -214,14 +214,14 @@ class Preset:
         self.handles.remove()
 
         for canonizer in self.canonizers:
-            self.handles.append(canonizer(module))
+            self.handles += canonizer.apply(module)
 
         for name, child in module.named_modules():
-            for applicable, hook_template in self.module_map:
-                if applicable(name, child):
-                    hook = hook_template.copy()
-                    self.handles.append(child.register_forward_hook(hook.forward))
-                    self.handles.append(child.register_backward_hook(hook.backward))
+            template = self.module_map(name, child)
+            if template is not None:
+                hook = template.copy()
+                self.handles.append(child.register_forward_hook(hook.forward))
+                self.handles.append(child.register_backward_hook(hook.backward))
 
     def remove(self):
         '''Remove all handles for hooks and canonizers.
