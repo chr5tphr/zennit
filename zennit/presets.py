@@ -1,6 +1,7 @@
 '''Presets, registered in a global preset dict.'''
 import torch
 
+from .canonizers import MergeBatchNorm
 from .core import Preset
 from .rules import Gamma, Epsilon, ZBox
 from .types import Convolution
@@ -26,9 +27,9 @@ class LayerMapPreset(Preset):
     layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook.
     '''
-    def __init__(self, layer_map):
-        super().__init__()
+    def __init__(self, layer_map, canonizers=None):
         self.layer_map = layer_map
+        super().__init__(self.mapping, canonizers)
 
     # pylint: disable=unused-argument
     def mapping(self, ctx, name, module):
@@ -61,9 +62,9 @@ class SpecialFirstLayerMapPreset(LayerMapPreset):
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         Applicable mapping for the first layer, same format as `layer_map`.
     '''
-    def __init__(self, layer_map, first_map):
-        super().__init__(layer_map)
+    def __init__(self, layer_map, first_map, canonizers=None):
         self.first_map = first_map
+        super().__init__(layer_map, canonizers)
 
     def mapping(self, ctx, name, module):
         '''Get the appropriate hook given a mapping from module types to hooks and a special mapping for the first
@@ -101,9 +102,9 @@ class NameMapPreset(Preset):
     name_map: `list[tuple[tuple[str, ...], Hook]]`
         A mapping as a list of tuples, with a tuple of applicable module names and a Hook.
     '''
-    def __init__(self, name_map):
-        super().__init__()
+    def __init__(self, name_map, canonizers=None):
         self.name_map = name_map
+        super().__init__(self.mapping, canonizers)
 
     # pylint: disable=unused-argument
     def mapping(self, ctx, name, module):
@@ -134,9 +135,9 @@ class GammaEpsilon(SpecialFirstLayerMapPreset):
     Parameters
     ----------
     low: obj:`torch.Tensor`
-        A tensor with the same size as the input, describing the lowest possible pixel value.
+        A tensor with the same size as the input, describing the lowest possible pixel values.
     high: obj:`torch.Tensor`
-        A tensor with the same size as the input, describing the highest possible pixel value.
+        A tensor with the same size as the input, describing the highest possible pixel values.
     '''
     def __init__(self, low, high):
         layer_map = [
@@ -146,4 +147,4 @@ class GammaEpsilon(SpecialFirstLayerMapPreset):
         first_map = [
             (Convolution, ZBox(low, high))
         ]
-        super().__init__(layer_map, first_map)
+        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm])
