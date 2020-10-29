@@ -96,7 +96,7 @@ class ZBox(LinearHook):
                 lambda param: param.clamp(min=0),
                 lambda param: param.clamp(max=0)
             ],
-            gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(sub(*outputs))] * 3),
+            gradient_mapper=(lambda out_grad, outputs: (out_grad / stabilize(sub(*outputs)),) * 3),
             reducer=(lambda inputs, gradients: sub(*(input * gradient for input, gradient in zip(inputs, gradients))))
         )
 
