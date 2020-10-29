@@ -138,18 +138,19 @@ class LinearHook(Hook):
         outputs = []
         for in_mod, param_mod in zip(self.input_modifiers, self.param_modifiers):
             input = in_mod(self.input[0].detach()).requires_grad_()
-            with mod_params(module, param_mod) as modified:
+            with mod_params(module, param_mod) as modified, torch.autograd.enable_grad():
                 output = modified.forward(input)
             inputs.append(input)
             outputs.append(output)
-        gradients = torch.autograd.grad(inputs, outputs, grad_outputs=self.gradient_mapper(grad_output, outputs))
-        return self.reducer([input.detach_() for input in inputs], [gradient.detach_() for gradient in gradients])
+        gradients = torch.autograd.grad(outputs, inputs, grad_outputs=self.gradient_mapper(grad_output[0], outputs))
+        relevance = self.reducer([input.detach_() for input in inputs], [gradient.detach_() for gradient in gradients])
+        return tuple(relevance if original.shape == relevance.shape else None for original in grad_input)
 
     def copy(self):
         '''Return a copy of this hook.
         This is used to describe hooks of different modules by a single hook instance.
         '''
-        return self.__class__(self.input_modifiers, self.param_modifiers, self.gradient_mapper, self.reducer)
+        return LinearHook(self.input_modifiers, self.param_modifiers, self.gradient_mapper, self.reducer)
 
 
 class RemovableHandleList(list):
