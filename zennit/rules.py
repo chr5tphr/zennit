@@ -16,6 +16,7 @@ class Epsilon(LinearHook):
         super().__init__(
             input_modifiers=[lambda input: input],
             param_modifiers=[lambda param: param],
+            output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0], epsilon)),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
         )
@@ -33,6 +34,7 @@ class Gamma(LinearHook):
         super().__init__(
             input_modifiers=[lambda input: input],
             param_modifiers=[lambda param: param + gamma * param.clamp(min=0)],
+            output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
         )
@@ -44,6 +46,7 @@ class ZPlus(LinearHook):
         super().__init__(
             input_modifiers=[lambda input: input],
             param_modifiers=[lambda param: param.clamp(min=0)],
+            output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
         )
@@ -55,16 +58,17 @@ class AlphaBeta(LinearHook):
     Parameters
     ----------
     alpha: float, optional
-        Multiplier for the positive weight part.
+        Multiplier for the positive output term.
     beta: float, optional
-        Multiplier for the negative weight part.
+        Multiplier for the negative output term.
     '''
     def __init__(self, alpha=2., beta=1.):
         super().__init__(
             input_modifiers=[lambda input: input] * 2,
-            param_modifiers=[
-                lambda param: param.clamp(min=0),
-                lambda param: param.clamp(max=0)
+            param_modifiers=[lambda param: param] * 2,
+            output_modifiers=[
+                lambda output: output.clamp(min=0),
+                lambda output: output.clamp(max=0),
             ],
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
             reducer=(lambda inputs, gradients: inputs[0] * (alpha * gradients[0] + beta * gradients[1]))
@@ -96,6 +100,7 @@ class ZBox(LinearHook):
                 lambda param: param.clamp(min=0),
                 lambda param: param.clamp(max=0)
             ],
+            output_modifiers=[lambda output: output] * 3,
             gradient_mapper=(lambda out_grad, outputs: (out_grad / stabilize(sub(*outputs)),) * 3),
             reducer=(lambda inputs, gradients: sub(*(input * gradient for input, gradient in zip(inputs, gradients))))
         )
@@ -119,6 +124,7 @@ class Norm(LinearHook):
         super().__init__(
             input_modifiers=[lambda input: input],
             param_modifiers=[None],
+            output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
         )
@@ -130,6 +136,7 @@ class WSquare(LinearHook):
         super().__init__(
             input_modifiers=[torch.ones_like],
             param_modifiers=[lambda param: param ** 2],
+            output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: gradients[0])
         )
@@ -142,6 +149,7 @@ class Flat(LinearHook):
         super().__init__(
             input_modifiers=[torch.ones_like],
             param_modifiers=[torch.ones_like],
+            output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: gradients[0])
         )

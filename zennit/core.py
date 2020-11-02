@@ -117,10 +117,32 @@ class LinearHook(Hook):
         Call signature is of form `(inputs, gradients)`, where `inputs` and `gradients` have the same as
         `input_modifiers` and `param_modifiers`
     '''
-    def __init__(self, input_modifiers, param_modifiers, gradient_mapper, reducer):
+    def __init__(
+        self,
+        input_modifiers=None,
+        param_modifiers=None,
+        output_modifiers=None,
+        gradient_mapper=None,
+        reducer=None
+    ):
         super().__init__()
-        self.input_modifiers = input_modifiers
-        self.param_modifiers = param_modifiers
+        modifiers = {
+            'in': input_modifiers,
+            'param': param_modifiers,
+            'out': output_modifiers,
+        }
+        supplied = {key for key, val in modifiers.items() if val is not None}
+        num_mods = len(next(iter(supplied), (None,)))
+        modifiers.update({key: (self._default_modifier,) * num_mods for key in set(modifiers) - supplied})
+
+        if gradient_mapper is None:
+            gradient_mapper = self._default_gradient_mapper
+        if reducer is None:
+            reducer = self._default_reducer
+
+        self.input_modifiers = modifiers['in']
+        self.param_modifiers = modifiers['param']
+        self.output_modifiers = modifiers['out']
         self.gradient_mapper = gradient_mapper
         self.reducer = reducer
 
@@ -136,10 +158,11 @@ class LinearHook(Hook):
         '''Backward hook to compute LRP based on the class attributes.'''
         inputs = []
         outputs = []
-        for in_mod, param_mod in zip(self.input_modifiers, self.param_modifiers):
+        for in_mod, param_mod, out_mod in zip(self.input_modifiers, self.param_modifiers, self.output_modifiers):
             input = in_mod(self.input[0].detach()).requires_grad_()
             with mod_params(module, param_mod) as modified, torch.autograd.enable_grad():
                 output = modified.forward(input)
+                output = out_mod(output)
             inputs.append(input)
             outputs.append(output)
         gradients = torch.autograd.grad(outputs, inputs, grad_outputs=self.gradient_mapper(grad_output[0], outputs))
@@ -150,7 +173,25 @@ class LinearHook(Hook):
         '''Return a copy of this hook.
         This is used to describe hooks of different modules by a single hook instance.
         '''
-        return LinearHook(self.input_modifiers, self.param_modifiers, self.gradient_mapper, self.reducer)
+        return LinearHook(
+            self.input_modifiers,
+            self.param_modifiers,
+            self.output_modifiers,
+            self.gradient_mapper,
+            self.reducer
+        )
+
+    @staticmethod
+    def _default_modifier(obj):
+        return obj
+
+    @staticmethod
+    def _default_gradient_mapper(out_grad, outputs):
+        return tuple(out_grad / stabilize(output) for output in outputs)
+
+    @staticmethod
+    def _default_reducer(inputs, gradients):
+        return sum(input * gradient for input, gradient in zip(inputs, gradients))
 
 
 class RemovableHandleList(list):
