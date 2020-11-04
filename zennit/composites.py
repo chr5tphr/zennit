@@ -1,26 +1,26 @@
-'''Presets, registered in a global preset dict.'''
+'''Composites, registered in a global composite dict.'''
 import torch
 
 from .canonizers import MergeBatchNorm
-from .core import Preset
-from .rules import Gamma, Epsilon, ZBox
-from .types import Convolution
+from .core import Composite
+from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass
+from .types import Convolution, Linear
 
 
-PRESETS = {}
+COMPOSITES = {}
 
 
-def register_preset(name):
-    '''Register a preset in the global PRESETS dict under `name`.'''
-    def wrapped(preset):
-        '''Wrapped function to be called on the preset to register it to the global PRESETS dict.'''
-        PRESETS[name] = preset
-        return preset
+def register_composite(name):
+    '''Register a composite in the global COMPOSITES dict under `name`.'''
+    def wrapped(composite):
+        '''Wrapped function to be called on the composite to register it to the global COMPOSITES dict.'''
+        COMPOSITES[name] = composite
+        return composite
     return wrapped
 
 
-class LayerMapPreset(Preset):
-    '''A Preset for which hooks are specified by a mapping from module types to hooks.
+class LayerMapComposite(Composite):
+    '''A Composite for which hooks are specified by a mapping from module types to hooks.
 
     Parameters
     ----------
@@ -52,8 +52,8 @@ class LayerMapPreset(Preset):
         return next((hook for types, hook in self.layer_map if isinstance(module, types)), None)
 
 
-class SpecialFirstLayerMapPreset(LayerMapPreset):
-    '''A Preset for which hooks are specified by a mapping from module types to hooks.
+class SpecialFirstLayerMapComposite(LayerMapComposite):
+    '''A Composite for which hooks are specified by a mapping from module types to hooks.
 
     Parameters
     ----------
@@ -94,8 +94,8 @@ class SpecialFirstLayerMapPreset(LayerMapPreset):
         return super().mapping(ctx, name, module)
 
 
-class NameMapPreset(Preset):
-    '''A Preset for which hooks are specified by a mapping from module types to hooks.
+class NameMapComposite(Composite):
+    '''A Composite for which hooks are specified by a mapping from module types to hooks.
 
     Parameters
     ----------
@@ -127,9 +127,9 @@ class NameMapPreset(Preset):
         return next((hook for names, hook in self.name_map if name in names), None)
 
 
-register_preset('gamma_epsilon')
-class GammaEpsilon(SpecialFirstLayerMapPreset):
-    '''An explicit preset using the ZBox rule for the first convolutional layer, gamma rule for all following
+@register_composite('epsilon_gamma_box')
+class EpsilonGammaBox(SpecialFirstLayerMapComposite):
+    '''An explicit composite using the ZBox rule for the first convolutional layer, gamma rule for all following
     convolutional layers, and the epsilon rule for all fully connected layers.
 
     Parameters
@@ -142,9 +142,72 @@ class GammaEpsilon(SpecialFirstLayerMapPreset):
     def __init__(self, low, high):
         layer_map = [
             (Convolution, Gamma(gamma=0.25)),
-            (torch.nn.Linear, Epsilon())
+            (torch.nn.Linear, Epsilon()),
+            (torch.nn.ReLU, Pass()),
         ]
         first_map = [
             (Convolution, ZBox(low, high))
+        ]
+        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm])
+
+
+@register_composite('epsilon_plus')
+class EpsilonPlus(LayerMapComposite):
+    '''An explicit composite using the zplus rule for all convolutional layers and the epsilon rule for all fully
+    connected layers.
+    '''
+    def __init__(self):
+        layer_map = [
+            (Convolution, ZPlus()),
+            (torch.nn.Linear, Epsilon()),
+            (torch.nn.ReLU, Pass()),
+        ]
+        super().__init__(layer_map, canonizers=[MergeBatchNorm])
+
+
+@register_composite('epsilon_alpha2_beta1')
+class EpsilonAlpha2Beta1(LayerMapComposite):
+    '''An explicit composite using the alpha2-beta1 rule for all convolutional layers and the epsilon rule for all
+    fully connected layers.
+    '''
+    def __init__(self):
+        layer_map = [
+            (Convolution, AlphaBeta(alpha=2, beta=1)),
+            (torch.nn.Linear, Epsilon()),
+            (torch.nn.ReLU, Pass()),
+        ]
+        super().__init__(layer_map, canonizers=[MergeBatchNorm])
+
+
+@register_composite('epsilon_plus_flat')
+class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
+    '''An explicit composite using the flat rule for any linear first layer, the zplus rule for all other convolutional
+    layers and the epsilon rule for all other fully connected layers.
+    '''
+    def __init__(self):
+        layer_map = [
+            (Convolution, ZPlus()),
+            (torch.nn.Linear, Epsilon()),
+            (torch.nn.ReLU, Pass()),
+        ]
+        first_map = [
+            (Linear, Flat())
+        ]
+        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm])
+
+
+@register_composite('epsilon_alpha2_beta1_flat')
+class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
+    '''An explicit composite using the flat rule for any linear first layer, the alpha2-beta1 rule for all other
+    convolutional layers and the epsilon rule for all other fully connected layers.
+    '''
+    def __init__(self):
+        layer_map = [
+            (Convolution, AlphaBeta(alpha=2, beta=1)),
+            (torch.nn.Linear, Epsilon()),
+            (torch.nn.ReLU, Pass()),
+        ]
+        first_map = [
+            (Linear, Flat())
         ]
         super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm])

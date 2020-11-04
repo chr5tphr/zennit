@@ -203,31 +203,31 @@ class RemovableHandleList(list):
         self.clear()
 
 
-class PresetContext:
-    '''A context object to register a preset in a context and remove the associated hooks and canonizers afterwards.
+class CompositeContext:
+    '''A context object to register a composite in a context and remove the associated hooks and canonizers afterwards.
 
     Parameters
     ----------
     module: obj:`torch.nn.Module`
-        The module to which `preset` should be registered.
-    preset: obj:`Preset`
-        The preset which shall be registered to `module`.
+        The module to which `composite` should be registered.
+    composite: obj:`Composite`
+        The composite which shall be registered to `module`.
     '''
-    def __init__(self, module, preset):
+    def __init__(self, module, composite):
         self.module = module
-        self.preset = preset
+        self.composite = composite
 
     def __enter__(self):
-        self.preset.register(self.module)
+        self.composite.register(self.module)
         return self.module
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.preset.remove()
+        self.composite.remove()
 
 
-class Preset:
-    '''A Preset to apply canonizers and register hooks to modules.
-    One Preset instance may only be applied to a single module at a time.
+class Composite:
+    '''A Composite to apply canonizers and register hooks to modules.
+    One Composite instance may only be applied to a single module at a time.
 
     Parameters
     ----------
@@ -245,7 +245,7 @@ class Preset:
 
     def register(self, module):
         '''Apply all canonizers and register all hooks to a module (and its recursive children).
-        Previous canonizers of this preset are reverted and all hooks registered by this preset are removed.
+        Previous canonizers of this composite are reverted and all hooks registered by this composite are removed.
         The module or any of its children (recursively) may still have other hooks attached.
 
         Parameters
@@ -274,11 +274,11 @@ class Preset:
         self.handles.remove()
 
     def context(self, module):
-        '''Return a PresetContext object with this instance and the supplied module.
+        '''Return a CompositeContext object with this instance and the supplied module.
 
         Parameters
         ----------
         module: obj:`torch.nn.module`
-            Module for which to register this preset in the context.
+            Module for which to register this composite in the context.
         '''
-        return PresetContext(module, self)
+        return CompositeContext(module, self)
