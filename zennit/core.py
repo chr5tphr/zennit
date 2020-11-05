@@ -235,9 +235,12 @@ class Composite:
         A mapping from functions that check applicability of hooks to hook instances that shall be applied to instances
         of applicable modules.
     canonizers: list[Canonizer]
-        List of canonizer types to be applied before applying hooks.
+        List of canonizer instances to be applied before applying hooks.
     '''
     def __init__(self, module_map=None, canonizers=None):
+        if canonizers is None:
+            canonizers = []
+
         self.module_map = module_map
         self.canonizers = canonizers
 

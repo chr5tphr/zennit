@@ -11,9 +11,8 @@ class Canonizer(metaclass=ABCMeta):
     '''Canonizer Base class.
     Canonizers modify modules temporarily such that certain attribution rules can properly be applied.
     '''
-    @classmethod
     @abstractmethod
-    def apply(cls, module):
+    def apply(self, module):
         '''Apply this canonizer recursively on all applicable modules.
 
         Parameters
@@ -36,6 +35,9 @@ class Canonizer(metaclass=ABCMeta):
     def remove(self):
         '''Revert the changes introduces by this canonizer.'''
 
+    def copy(self):
+        return self.__class__()
+
 
 class MergeBatchNorm(Canonizer):
     '''Canonizer to merge the parameters of all batch norms that appear sequentially right after a linear module.
@@ -54,51 +56,42 @@ class MergeBatchNorm(Canonizer):
         BatchNorm,
     )
 
-    def __init__(self, linear, batch_norm):
-        self.linear = linear
+    def __init__(self):
+        self.linears = None
+        self.batch_norm = None
+
+        self.linear_params = None
+        self.batch_norm_params = None
+
+    def register(self, linears, batch_norm):
+        '''Store the parameters of the linear modules and the batch norm module and apply the merge.'''
+        self.linears = linears
         self.batch_norm = batch_norm
 
-        self.linear_weight = None
-        self.linear_bias = None
+        self.linear_params = [(linear.weight.data, getattr(linear.bias, 'data', None)) for linear in linears]
 
-        self.weight = None
-        self.bias = None
-        self.running_mean = None
-        self.running_var = None
+        self.batch_norm_params = {
+            key: getattr(self.batch_norm, key).data for key in ('weight', 'bias', 'running_mean', 'running_var')
+        }
 
-        self.register()
-
-    def register(self):
-        '''Store the parameters of the linear and the batch norm modules and apply the merge.'''
-        self.linear_weight = self.linear.weight.data
-        if self.linear.bias is not None:
-            self.linear_bias = self.linear.bias.data
-
-        self.weight = self.batch_norm.weight.data
-        self.bias = self.batch_norm.bias.data
-        self.running_mean = self.batch_norm.running_mean.data
-        self.running_var = self.batch_norm.running_var.data
-
-        self.merge_batch_norm(self.linear, self.batch_norm)
+        self.merge_batch_norm(self.linears, self.batch_norm)
 
     def remove(self):
-        '''Undo the merge by reverting the parameters of both the linear and the batch norm modules to what they were
-        before the merge.'''
-        self.linear.weight.data = self.linear_weight
+        '''Undo the merge by reverting the parameters of both the linear and the batch norm modules to the state before
+        the merge.
+        '''
+        for linear, (weight, bias) in zip(self.linears, self.linear_params):
+            linear.weight.data = weight
+            if bias is None:
+                linear.bias = None
+            else:
+                linear.bias.data = bias
 
-        if self.linear_bias is None:
-            self.linear.bias = None
-        else:
-            self.linear.bias.data = self.linear_bias
+        for key, value in self.batch_norm_params.items():
+            getattr(self.batch_norm, key).data = value
 
-        self.batch_norm.weight.data = self.weight
-        self.batch_norm.bias.data = self.bias
-        self.batch_norm.running_mean.data = self.running_mean
-        self.batch_norm.running_var.data = self.running_var
-
-    @classmethod
-    def apply(cls, module):
-        '''Finds a batch norm following right after a linear layer, and creates an instance of this class to merge
+    def apply(self, module):
+        '''Finds a batch norm following right after a linear layer, and creates a copy of this instance to merge
         them by fusing the batch norm parameters into the linear layer and reducing the batch norm to the identity.
 
         Parameters
@@ -115,36 +108,41 @@ class MergeBatchNorm(Canonizer):
         instances = []
         last_leaf = None
         for leaf in collect_leaves(module):
-            if isinstance(last_leaf, cls.linear_type) and isinstance(leaf, cls.batch_norm_type):
-                instances.append(cls(last_leaf, leaf))
+            if isinstance(last_leaf, self.linear_type) and isinstance(leaf, self.batch_norm_type):
+                instance = self.copy()
+                instance.register((last_leaf,), leaf)
+                instances.append(instance)
             last_leaf = leaf
 
         return instances
 
     @staticmethod
-    def merge_batch_norm(module, batch_norm):
+    def merge_batch_norm(modules, batch_norm):
         '''Update parameters of a linear layer to additionally include a Batch Normalization operation and update the
         batch normalization layer to instead compute the identity.
 
         Parameters
         ----------
-        module: obj:`torch.nn.Module`
-            Linear layer with mandatory attributes `weight` and `bias`.
+        modules: list of obj:`torch.nn.Module`
+            Linear layers with mandatory attributes `weight` and `bias`.
         batch_norm: obj:`torch.nn.Module`
             Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and
             `eps`
         '''
-        original_weight = module.weight.data
-        if module.bias is None:
-            module.bias = torch.nn.Parameter(torch.zeros(1, device=original_weight.device, dtype=original_weight.dtype))
-        original_bias = module.bias.data
-
         denominator = (batch_norm.running_var + batch_norm.eps) ** .5
         scale = (batch_norm.weight / denominator)
 
-        # merge batch_norm into linear layer
-        module.weight.data = (original_weight * scale[:, None, None, None])
-        module.bias.data = (original_bias - batch_norm.running_mean) * scale + batch_norm.bias
+        for module in modules:
+            original_weight = module.weight.data
+            if module.bias is None:
+                module.bias = torch.nn.Parameter(
+                    torch.zeros(1, device=original_weight.device, dtype=original_weight.dtype)
+                )
+            original_bias = module.bias.data
+
+            # merge batch_norm into linear layer
+            module.weight.data = (original_weight * scale[:, None, None, None])
+            module.bias.data = (original_bias - batch_norm.running_mean) * scale + batch_norm.bias
 
         # change batch_norm parameters to produce identity
         batch_norm.running_mean.data = torch.zeros_like(batch_norm.running_mean.data)

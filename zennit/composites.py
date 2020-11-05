@@ -148,7 +148,7 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
         first_map = [
             (Convolution, ZBox(low, high))
         ]
-        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm])
+        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm()])
 
 
 @register_composite('epsilon_plus')
@@ -162,7 +162,7 @@ class EpsilonPlus(LayerMapComposite):
             (torch.nn.Linear, Epsilon()),
             (torch.nn.ReLU, Pass()),
         ]
-        super().__init__(layer_map, canonizers=[MergeBatchNorm])
+        super().__init__(layer_map, canonizers=[MergeBatchNorm()])
 
 
 @register_composite('epsilon_alpha2_beta1')
@@ -176,7 +176,7 @@ class EpsilonAlpha2Beta1(LayerMapComposite):
             (torch.nn.Linear, Epsilon()),
             (torch.nn.ReLU, Pass()),
         ]
-        super().__init__(layer_map, canonizers=[MergeBatchNorm])
+        super().__init__(layer_map, canonizers=[MergeBatchNorm()])
 
 
 @register_composite('epsilon_plus_flat')
@@ -193,7 +193,7 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
         first_map = [
             (Linear, Flat())
         ]
-        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm])
+        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm()])
 
 
 @register_composite('epsilon_alpha2_beta1_flat')
@@ -210,4 +210,4 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
         first_map = [
             (Linear, Flat())
         ]
-        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm])
+        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm()])
