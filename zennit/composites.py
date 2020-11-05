@@ -139,7 +139,7 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
     high: obj:`torch.Tensor`
         A tensor with the same size as the input, describing the highest possible pixel values.
     '''
-    def __init__(self, low, high):
+    def __init__(self, low, high, canonizers=None):
         layer_map = [
             (Convolution, Gamma(gamma=0.25)),
             (torch.nn.Linear, Epsilon()),
@@ -148,7 +148,7 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
         first_map = [
             (Convolution, ZBox(low, high))
         ]
-        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm()])
+        super().__init__(layer_map, first_map, canonizers=canonizers)
 
 
 @register_composite('epsilon_plus')
@@ -162,7 +162,7 @@ class EpsilonPlus(LayerMapComposite):
             (torch.nn.Linear, Epsilon()),
             (torch.nn.ReLU, Pass()),
         ]
-        super().__init__(layer_map, canonizers=[MergeBatchNorm()])
+        super().__init__(layer_map, canonizers=canonizers)
 
 
 @register_composite('epsilon_alpha2_beta1')
@@ -170,13 +170,13 @@ class EpsilonAlpha2Beta1(LayerMapComposite):
     '''An explicit composite using the alpha2-beta1 rule for all convolutional layers and the epsilon rule for all
     fully connected layers.
     '''
-    def __init__(self):
+    def __init__(self, canonizers=None):
         layer_map = [
             (Convolution, AlphaBeta(alpha=2, beta=1)),
             (torch.nn.Linear, Epsilon()),
             (torch.nn.ReLU, Pass()),
         ]
-        super().__init__(layer_map, canonizers=[MergeBatchNorm()])
+        super().__init__(layer_map, canonizers=canonizers)
 
 
 @register_composite('epsilon_plus_flat')
@@ -184,7 +184,7 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
     '''An explicit composite using the flat rule for any linear first layer, the zplus rule for all other convolutional
     layers and the epsilon rule for all other fully connected layers.
     '''
-    def __init__(self):
+    def __init__(self, canonizers=None):
         layer_map = [
             (Convolution, ZPlus()),
             (torch.nn.Linear, Epsilon()),
@@ -193,7 +193,7 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
         first_map = [
             (Linear, Flat())
         ]
-        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm()])
+        super().__init__(layer_map, first_map, canonizers=canonizers)
 
 
 @register_composite('epsilon_alpha2_beta1_flat')
@@ -201,7 +201,7 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
     '''An explicit composite using the flat rule for any linear first layer, the alpha2-beta1 rule for all other
     convolutional layers and the epsilon rule for all other fully connected layers.
     '''
-    def __init__(self):
+    def __init__(self, canonizers=None):
         layer_map = [
             (Convolution, AlphaBeta(alpha=2, beta=1)),
             (torch.nn.Linear, Epsilon()),
@@ -210,4 +210,4 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
         first_map = [
             (Linear, Flat())
         ]
-        super().__init__(layer_map, first_map, canonizers=[MergeBatchNorm()])
+        super().__init__(layer_map, first_map, canonizers=canonizers)
