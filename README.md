@@ -42,6 +42,8 @@ from zennit.composite import EpsilonGammaBox
 from zennit.canonizers import SequentialBatchNorm
 
 
+model = vgg16_bn()
+
 shape = (16, 3, 224, 224)
 
 # generate some random data
