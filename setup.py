@@ -9,7 +9,6 @@ setup(
         'numpy',
         'Pillow',
         'torch',
-        'torchvision',
     ],
     setup_requires=[
         'setuptools_scm',
