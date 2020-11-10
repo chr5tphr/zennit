@@ -10,7 +10,7 @@ Interfaces may change suddenly and without warning, so please be careful when at
 state.
 
 ## Usage
-An example can be found in `examples/feed_forward.py`.
+An example can be found in `share/example/feed_forward.py`.
 Currently, only feed-forward type models are supported.
 
 At its heart, Zennit registers hooks at PyTorch's Module level, to modify the backward pass to produce LRP
