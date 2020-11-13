@@ -36,6 +36,7 @@ class Canonizer(metaclass=ABCMeta):
         '''Revert the changes introduces by this canonizer.'''
 
     def copy(self):
+        '''Return a copy of this instance.'''
         return self.__class__()
 
 
@@ -49,6 +50,7 @@ class MergeBatchNorm(Canonizer):
     )
 
     def __init__(self):
+        super().__init__()
         self.linears = None
         self.batch_norm = None
 
@@ -63,7 +65,8 @@ class MergeBatchNorm(Canonizer):
         linear: list of obj:`torch.nn.Module`
             List of linear layer with mandatory attributes `weight` and `bias`.
         batch_norm: obj:`torch.nn.Module`
-            Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and `eps`
+            Batch Normalization module with mandatory attributes
+            `running_mean`, `running_var`, `weight`, `bias` and `eps`
         '''
         self.linears = linears
         self.batch_norm = batch_norm
@@ -163,6 +166,7 @@ class NamedMergeBatchNorm(MergeBatchNorm):
         List of which linear layer names belong to which batch norm name.
     '''
     def __init__(self, name_map):
+        super().__init__()
         self.name_map = name_map
 
     def apply(self, module):
@@ -179,7 +183,7 @@ class NamedMergeBatchNorm(MergeBatchNorm):
             A list of merge instances.
         '''
         instances = []
-        lookup = {name: child for name, child in module.named_modules()}
+        lookup = dict(module.named_modules())
 
         for linear_names, batch_norm_name in self.name_map:
             instance = self.copy()

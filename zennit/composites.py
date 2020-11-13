@@ -1,7 +1,6 @@
 '''Composites, registered in a global composite dict.'''
 import torch
 
-from .canonizers import MergeBatchNorm
 from .core import Composite
 from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass
 from .types import Convolution, Linear
