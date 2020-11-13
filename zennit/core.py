@@ -166,8 +166,8 @@ class LinearHook(Hook):
             inputs.append(input)
             outputs.append(output)
         gradients = torch.autograd.grad(outputs, inputs, grad_outputs=self.gradient_mapper(grad_output[0], outputs))
-        relevance = self.reducer([input.detach_() for input in inputs], [gradient.detach_() for gradient in gradients])
-        return tuple(relevance if original.shape == relevance.shape else None for original in grad_input)
+        relevance = self.reducer([input.detach() for input in inputs], [gradient.detach() for gradient in gradients])
+        return tuple(relevance if original.shape == relevance.shape else original for original in grad_input)
 
     def copy(self):
         '''Return a copy of this hook.

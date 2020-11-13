@@ -92,8 +92,8 @@ class ZBox(LinearHook):
         super().__init__(
             input_modifiers=[
                 lambda input: input,
-                lambda input: low,
-                lambda input: high,
+                lambda input: low[:input.shape[0]],
+                lambda input: high[:input.shape[0]],
             ],
             param_modifiers=[
                 lambda param: param,
