@@ -156,7 +156,7 @@ class EpsilonPlus(LayerMapComposite):
     '''An explicit composite using the zplus rule for all convolutional layers and the epsilon rule for all fully
     connected layers.
     '''
-    def __init__(self):
+    def __init__(self, canonizers=None):
         layer_map = [
             (Convolution, ZPlus()),
             (torch.nn.Linear, Epsilon()),
