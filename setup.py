@@ -8,7 +8,7 @@ setup(
     install_requires=[
         'numpy',
         'Pillow',
-        'torch',
+        'torch==1.7.0',
     ],
     setup_requires=[
         'setuptools_scm',
