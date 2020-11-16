@@ -91,7 +91,7 @@ def main(
     composite = COMPOSITES[composite_name](**composite_kwargs)
 
     with composite.context(model) as modified:
-        data, target = next(loader)
+        data, target = next(iter(loader))
         data = data.to(device)
         data_norm = norm_fn(data)
         data_norm.requires_grad_()
