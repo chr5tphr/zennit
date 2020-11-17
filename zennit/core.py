@@ -1,4 +1,5 @@
 '''Core functions and classes'''
+import functools
 from contextlib import contextmanager
 
 import torch
@@ -82,8 +83,44 @@ def collect_leaves(module):
         yield module
 
 
+class Identity(torch.autograd.Function):
+    '''Identity to add a grad_fn to a tensor, so a backward hook can be applied.'''
+    @staticmethod
+    def forward(ctx, *inputs):
+        '''Forward identity.'''
+        if len(inputs) == 1:
+            return inputs[0]
+        return inputs
+
+    @staticmethod
+    def backward(ctx, *grad_outputs):
+        '''Backward identity.'''
+        if len(grad_outputs) == 1:
+            return grad_outputs[0]
+        return grad_outputs
+
+
 class Hook:
     '''Base class for hooks to be used to compute layerwise attributions.'''
+    def __init__(self):
+        self.grad_output = None
+
+    def pre_forward(self, module, input):
+        '''Apply an Identity to the input before the module to register a backward hook.'''
+        @functools.wraps(self.backward)
+        def wrapper(grad_input, grad_output):
+            return self.backward(module, grad_input, self.grad_output)
+
+        output = Identity.apply(input[0])
+        output.grad_fn.register_hook(wrapper)
+        # work around to support in-place operations
+        output = output.clone()
+        return (output,)
+
+    def pre_backward(self, module, grad_input, grad_output):
+        '''Store the grad_output for the backward hook'''
+        self.grad_output = grad_output
+
     def forward(self, module, input, output):
         '''Hook applied during forward-pass'''
 
@@ -152,7 +189,6 @@ class LinearHook(Hook):
     def forward(self, module, input, output):
         '''Forward hook to save module in-/outputs.'''
         self.input = input
-        self.output = output
 
     def backward(self, module, grad_input, grad_output):
         '''Backward hook to compute LRP based on the class attributes.'''
@@ -166,8 +202,9 @@ class LinearHook(Hook):
             inputs.append(input)
             outputs.append(output)
         gradients = torch.autograd.grad(outputs, inputs, grad_outputs=self.gradient_mapper(grad_output[0], outputs))
-        relevance = self.reducer([input.detach() for input in inputs], [gradient.detach() for gradient in gradients])
-        return tuple(relevance if original.shape == relevance.shape else original for original in grad_input)
+        # relevance = self.reducer([input.detach() for input in inputs], [gradient.detach() for gradient in gradients])
+        relevance = self.reducer(inputs, gradients)
+        return tuple(relevance if original.shape == relevance.shape else None for original in grad_input)
 
     def copy(self):
         '''Return a copy of this hook.
@@ -266,8 +303,9 @@ class Composite:
             template = self.module_map(ctx, name, child)
             if template is not None:
                 hook = template.copy()
+                self.handles.append(child.register_forward_pre_hook(hook.pre_forward))
                 self.handles.append(child.register_forward_hook(hook.forward))
-                self.handles.append(child.register_backward_hook(hook.backward))
+                self.handles.append(child.register_backward_hook(hook.pre_backward))
 
     def remove(self):
         '''Remove all handles for hooks and canonizers.
