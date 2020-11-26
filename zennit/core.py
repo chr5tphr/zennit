@@ -41,16 +41,14 @@ def mod_params(module, modifier):
         The input temporarily modified linear layer `module`.
     '''
     try:
-        if modifier is None:
-            yield modifier
-        else:
+        if modifier is not None:
             if module.weight is not None:
                 original_weight = module.weight.data
                 module.weight.data = modifier(module.weight.data)
             if module.bias is not None:
                 original_bias = module.bias.data
                 module.bias.data = modifier(module.bias.data)
-            yield module
+        yield module
     finally:
         if modifier is not None:
             if module.weight is not None:
