@@ -12,12 +12,12 @@ class Canonizer(metaclass=ABCMeta):
     Canonizers modify modules temporarily such that certain attribution rules can properly be applied.
     '''
     @abstractmethod
-    def apply(self, module):
+    def apply(self, root_module):
         '''Apply this canonizer recursively on all applicable modules.
 
         Parameters
         ----------
-        module: obj:`torch.nn.Module`
+        root_module: obj:`torch.nn.Module`
             Root module to which to apply the canonizers.
 
         Returns
@@ -130,13 +130,13 @@ class MergeBatchNorm(Canonizer):
 
 class SequentialMergeBatchNorm(MergeBatchNorm):
     '''Canonizer to merge the parameters of all batch norms that appear sequentially right after a linear module.'''
-    def apply(self, module):
+    def apply(self, root_module):
         '''Finds a batch norm following right after a linear layer, and creates a copy of this instance to merge
         them by fusing the batch norm parameters into the linear layer and reducing the batch norm to the identity.
 
         Parameters
         ----------
-        module: obj:`torch.nn.Module`
+        root_module: obj:`torch.nn.Module`
             A module of which the leaves will be searched and if a batch norm is found right after a linear layer, will
             be merged.
 
@@ -147,7 +147,7 @@ class SequentialMergeBatchNorm(MergeBatchNorm):
         '''
         instances = []
         last_leaf = None
-        for leaf in collect_leaves(module):
+        for leaf in collect_leaves(root_module):
             if isinstance(last_leaf, self.linear_type) and isinstance(leaf, self.batch_norm_type):
                 instance = self.copy()
                 instance.register((last_leaf,), leaf)
@@ -169,12 +169,12 @@ class NamedMergeBatchNorm(MergeBatchNorm):
         super().__init__()
         self.name_map = name_map
 
-    def apply(self, module):
+    def apply(self, root_module):
         '''Create appropriate merges given by the name map.
 
         Parameters
         ----------
-        module: obj:`torch.nn.Module`
+        root_module: obj:`torch.nn.Module`
             Root module for which underlying modules will be merged.
 
         Returns
@@ -183,7 +183,7 @@ class NamedMergeBatchNorm(MergeBatchNorm):
             A list of merge instances.
         '''
         instances = []
-        lookup = dict(module.named_modules())
+        lookup = dict(root_module.named_modules())
 
         for linear_names, batch_norm_name in self.name_map:
             instance = self.copy()
@@ -194,3 +194,111 @@ class NamedMergeBatchNorm(MergeBatchNorm):
 
     def copy(self):
         return self.__class__(self.name_map)
+
+
+class AttributeCanonizer(Canonizer):
+    '''Canonizer to set an attribute of module instances.
+    Note that the use of this Canonizer removes previously set attributes after removal.
+
+    Parameters
+    ----------
+    attribute_map: Function
+        A function that returns either None, if not applicable, or a dict with keys describing which attributes to
+        overload for a module. The function signature is (name: string, module: type) -> None or
+        dict.
+    '''
+    def __init__(self, attribute_map):
+        self.attribute_map = attribute_map
+        self.attribute_keys = None
+        self.module = None
+
+    def apply(self, root_module):
+        '''Overload the attributes for all applicable modules.
+
+        Parameters
+        ----------
+        root_module: obj:`torch.nn.Module`
+            Root module for which underlying modules will have their attributes overloaded.
+
+        Returns
+        -------
+        instances : list of obj:`Canonizer`
+            The applied canonizer instances, which may be removed by calling `.remove`.
+        '''
+        instances = []
+        for name, module in root_module.named_modules():
+            attributes = self.attribute_map(name, module)
+            if attributes is not None:
+                instance = self.copy()
+                instance.register(module, attributes)
+                instances.append(instance)
+        return instances
+
+    def register(self, module, attributes):
+        '''Overload the module's attributes.
+
+        Parameters
+        ---------
+        module : obj:`torch.nn.Module`
+            The module of which the attributes will be overloaded.
+        attributes : dict
+            The attributes which to overload for the module.
+        '''
+        self.attribute_keys = list(attributes)
+        self.module = module
+        for key, value in attributes.items():
+            setattr(module, key, value)
+
+    def remove(self):
+        '''Remove the overloaded attributes. Note that functions are descriptors, and therefore not direct attributes
+        of instance, which is why deleting instance attributes with the same name reverts them to the original
+        function.
+        '''
+        for key in self.attribute_keys:
+            delattr(self.module, key)
+
+    def copy(self):
+        '''Copy this Canonizer.
+
+        Returns
+        -------
+        obj:`Canonizer`
+            A copy of this Canonizer.
+        '''
+        return AttributeCanonizer(self.attribute_map)
+
+
+class CompositeCanonizer(Canonizer):
+    '''A Composite of Canonizers, which applies all supplied canonizers.
+
+    Parameters
+    ----------
+    canonizers : list of obj:`Canonizer`
+        Canonizers of which to build a Composite of.
+    '''
+    def __init__(self, canonizers):
+        self.canonizers = canonizers
+
+    def apply(self, root_module):
+        '''Apply call canonizers.
+
+        Parameters
+        ----------
+        root_module: obj:`torch.nn.Module`
+            Root module for which underlying modules will have canonizers applied.
+
+        Returns
+        -------
+        instances : list of obj:`Canonizer`
+            The applied canonizer instances, which may be removed by calling `.remove`.
+        '''
+        instances = []
+        for canonizer in self.canonizers:
+            instances += canonizer.apply(root_module)
+        return instances
+
+    def register(self):
+        '''Register this Canonizer. Nothing to do for a CompositeCanonizer.'''
+
+    def remove(self):
+        '''Remove this Canonizer. Nothing to do for a CompositeCanonizer.'''
