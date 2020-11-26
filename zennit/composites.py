@@ -2,20 +2,9 @@
 import torch
 
 from .core import Composite
-from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass
-from .types import Convolution, Linear
-
-
-COMPOSITES = {}
-
-
-def register_composite(name):
-    '''Register a composite in the global COMPOSITES dict under `name`.'''
-    def wrapped(composite):
-        '''Wrapped function to be called on the composite to register it to the global COMPOSITES dict.'''
-        COMPOSITES[name] = composite
-        return composite
-    return wrapped
+from .layer import Sum
+from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm
+from .types import Convolution, Linear, AvgPool, Activation
 
 
 class LayerMapComposite(Composite):
@@ -126,6 +115,25 @@ class NameMapComposite(Composite):
         return next((hook for names, hook in self.name_map if name in names), None)
 
 
+COMPOSITES = {}
+
+
+def register_composite(name):
+    '''Register a composite in the global COMPOSITES dict under `name`.'''
+    def wrapped(composite):
+        '''Wrapped function to be called on the composite to register it to the global COMPOSITES dict.'''
+        COMPOSITES[name] = composite
+        return composite
+    return wrapped
+
+
+LAYER_MAP_BASE = [
+    (Activation, Pass()),
+    (Sum, Norm()),
+    (AvgPool, Norm())
+]
+
+
 @register_composite('epsilon_gamma_box')
 class EpsilonGammaBox(SpecialFirstLayerMapComposite):
     '''An explicit composite using the ZBox rule for the first convolutional layer, gamma rule for all following
@@ -139,10 +147,9 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
         A tensor with the same size as the input, describing the highest possible pixel values.
     '''
     def __init__(self, low, high, canonizers=None):
-        layer_map = [
+        layer_map = LAYER_MAP_BASE + [
             (Convolution, Gamma(gamma=0.25)),
             (torch.nn.Linear, Epsilon()),
-            (torch.nn.ReLU, Pass()),
         ]
         first_map = [
             (Convolution, ZBox(low, high))
@@ -156,10 +163,9 @@ class EpsilonPlus(LayerMapComposite):
     connected layers.
     '''
     def __init__(self, canonizers=None):
-        layer_map = [
+        layer_map = LAYER_MAP_BASE + [
             (Convolution, ZPlus()),
             (torch.nn.Linear, Epsilon()),
-            (torch.nn.ReLU, Pass()),
         ]
         super().__init__(layer_map, canonizers=canonizers)
 
@@ -170,10 +176,9 @@ class EpsilonAlpha2Beta1(LayerMapComposite):
     fully connected layers.
     '''
     def __init__(self, canonizers=None):
-        layer_map = [
+        layer_map = LAYER_MAP_BASE + [
             (Convolution, AlphaBeta(alpha=2, beta=1)),
             (torch.nn.Linear, Epsilon()),
-            (torch.nn.ReLU, Pass()),
         ]
         super().__init__(layer_map, canonizers=canonizers)
 
@@ -184,10 +189,9 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
     layers and the epsilon rule for all other fully connected layers.
     '''
     def __init__(self, canonizers=None):
-        layer_map = [
+        layer_map = LAYER_MAP_BASE + [
             (Convolution, ZPlus()),
             (torch.nn.Linear, Epsilon()),
-            (torch.nn.ReLU, Pass()),
         ]
         first_map = [
             (Linear, Flat())
@@ -201,10 +205,9 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
     convolutional layers and the epsilon rule for all other fully connected layers.
     '''
     def __init__(self, canonizers=None):
-        layer_map = [
+        layer_map = LAYER_MAP_BASE + [
             (Convolution, AlphaBeta(alpha=2, beta=1)),
             (torch.nn.Linear, Epsilon()),
-            (torch.nn.ReLU, Pass()),
         ]
         first_map = [
             (Linear, Flat())
