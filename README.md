@@ -135,7 +135,7 @@ def main(
     if max_samples is not None:
         if shuffle:
             indices = sorted(
-            np.random.choice(len(dataset), min(len(dataset), max_samples), replace=False)
+                np.random.choice(len(dataset), min(len(dataset), max_samples), replace=False)
             )
         else:
             indices = range(min(len(dataset), max_samples))
