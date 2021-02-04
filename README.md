@@ -1,4 +1,7 @@
 # Zennit
+![Zennit-Logo](share/img/zennit.png)
+
+
 Zennit (**Z**ennit **e**xplains **n**eural **n**etworks **i**n **t**orch)
 is a high-level framework in Python using PyTorch for explaining/exploring neural networks.
 Its design philosophy is intended to provide high customizability and integration as a standardized solution
