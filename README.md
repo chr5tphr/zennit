@@ -70,7 +70,12 @@ class BatchNormalize:
 @click.command()
 @click.argument('dataset-root', type=click.Path(file_okay=False))
 @click.argument('relevance_format', type=click.Path(dir_okay=False, writable=True))
-@click.option('--composite', 'composite_name', type=click.Choice(list(COMPOSITES)), default='epsilon_gamma_box')
+@click.option(
+    '--composite',
+    'composite_name',
+    type=click.Choice(list(COMPOSITES)),
+    default='epsilon_gamma_box'
+)
 @click.option('--model', 'model_name', type=click.Choice(list(MODELS)), default='vgg16_bn')
 @click.option('--parameters', type=click.Path(dir_okay=False))
 @click.option(
@@ -122,13 +127,16 @@ def main(
         ToTensor(),
     ])
 
-    # the dataset is a folder containing folders with samples, where each folder corresponds to one label
+    # the dataset is a folder containing folders with samples, where each folder corresponds to one
+    # label
     dataset = ImageFolder(dataset_root, transform=transform)
 
     # limit the number of output samples, if requested, by creating a subset
     if max_samples is not None:
         if shuffle:
-            indices = sorted(np.random.choice(len(dataset), min(len(dataset), max_samples), replace=False))
+            indices = sorted(
+            np.random.choice(len(dataset), min(len(dataset), max_samples), replace=False)
+            )
         else:
             indices = range(min(len(dataset), max_samples))
         dataset = Subset(dataset, indices)
@@ -159,18 +167,19 @@ def main(
     # use torchvision specific canonizers, as supplied in the MODELS dict
     composite_kwargs['canonizers'] = [MODELS[model_name][1]()]
 
-    # create a composite specified by a name; the COMPOSITES dict includes all preset composites provided by zennit.
+    # create a composite specified by a name; the COMPOSITES dict includes all preset composites
+    # provided by zennit.
     composite = COMPOSITES[composite_name](**composite_kwargs)
 
     # the current sample index for creating file names
     sample = 0
 
-    # create the composite context outside the main loop, such that it canonizers and hooks do not need to be
-    # registered and removed for each step.
+    # create the composite context outside the main loop, such that it canonizers and hooks do not
+    # need to be registered and removed for each step.
     with composite.context(model) as modified:
         for data, target in loader:
-            # we use data without the normalization applied for visualization, and with the normalization applied as
-            # the model input
+            # we use data without the normalization applied for visualization, and with the
+            # normalization applied as the model input
             data_norm = norm_fn(data.to(device))
             data_norm.requires_grad_()
 
@@ -194,8 +203,8 @@ def main(
                 imsave(fname, relevance[n], vmin=0., vmax=1., level=level, cmap=cmap)
                 if input_format is not None:
                     fname = input_format.format(sample=sample + n)
-                    # if there are 3 color channels, imsave will not create a heatmap, but instead save the image with
-                    # its appropriate colors
+                    # if there are 3 color channels, imsave will not create a heatmap, but instead
+                    # save the image with its appropriate colors
                     imsave(fname, data[n])
             sample += len(data)
 
