@@ -1,5 +1,5 @@
 # Zennit
-Zennit (__Z__ennit __e__xplains __n__eural __n__etworks __i__n __t__orch)
+Zennit (**Z**ennit **e**xplains **n**eural **n**etworks **i**n **t**orch)
 is a high-level framework in Python using PyTorch for explaining/exploring neural networks.
 Its design philosophy is intended to provide high customizability and integration as a standardized solution
 for applying LRP-based attribution methods in research.
@@ -16,8 +16,8 @@ Currently, only feed-forward type models are supported.
 At its heart, Zennit registers hooks at PyTorch's Module level, to modify the backward pass to produce LRP
 attributions (instead of the usual gradient).
 All rules are implemented as hooks (`zennit/rules.py`) and most use the basic `LinearHook` (`zennit/core.py`).
-__Composites__ are a way of choosing the right hook for the right layer.
-In addition to the abstract __NameMapComposite__, which assigns hooks to layers by name, and __LayerMapComposite__,
+**Composites** are a way of choosing the right hook for the right layer.
+In addition to the abstract **NameMapComposite**, which assigns hooks to layers by name, and **LayerMapComposite**,
 which assigns hooks to layers based on their Type, there exist explicit Composites, which currently are
 * EpsilonGammaBox (ZBox in input, epsilon in dense, Gamma 0.25 in convolutions)
 * EpsilonPlus (PresetA in iNNvestigate)
@@ -27,8 +27,8 @@ which assigns hooks to layers based on their Type, there exist explicit Composit
 
 They may be used by directly importing from `zennit.composites`, or by using their snake-case name as key for
 `zennit.composites.COMPOSITES`.
-Additionally, there are __Canonizers__, which modify models such that LRP may be applied, if needed.
-Currently, there is only one __Canonizer__, which is `MergeBatchNorm`.
+Additionally, there are **Canonizers**, which modify models such that LRP may be applied, if needed.
+Currently, there is only one **Canonizer**, which is `MergeBatchNorm`.
 There are two versions of `MergeBatchNorm`, `SequentialMergeBatchNorm`, which automatically detects BatchNorm layers
 followed by linear layers in sequential networks, and `NamedMergeBatchNorm`, which expects a list of tuples to assign
 one or more linear layers to one batch norm layer.
