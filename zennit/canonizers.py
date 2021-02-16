@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 import torch
 
 from .core import collect_leaves
-from .types import Linear, BatchNorm
+from .categories import Linear, BatchNorm
 
 
 class Canonizer(metaclass=ABCMeta):

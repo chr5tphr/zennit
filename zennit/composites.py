@@ -4,7 +4,7 @@ import torch
 from .core import Composite
 from .layer import Sum
 from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm
-from .types import Convolution, Linear, AvgPool, Activation
+from .categories import Convolution, Linear, AvgPool, Activation
 
 
 class LayerMapComposite(Composite):

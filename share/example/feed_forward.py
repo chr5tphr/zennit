@@ -11,7 +11,7 @@ from torchvision.models import vgg16, vgg16_bn, resnet50
 
 from zennit.composites import COMPOSITES
 from zennit.image import imsave, CMAPS
-from zennit.torchvision import VGGCanonizer, ResNetCanonizer
+from zennit.special import VGGCanonizer, ResNetCanonizer
 
 
 MODELS = {
