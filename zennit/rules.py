@@ -44,11 +44,17 @@ class ZPlus(LinearHook):
     '''ZPlus (or alpha=1, beta=0) LRP rule.'''
     def __init__(self):
         super().__init__(
-            input_modifiers=[lambda input: input],
-            param_modifiers=[lambda param: param.clamp(min=0)],
-            output_modifiers=[lambda output: output],
-            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
-            reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
+            input_modifiers=[
+                lambda input: input.clamp(min=0), 
+                lambda input: input.clamp(max=0),
+            ], 
+            param_modifiers=[
+                lambda param: param.clamp(min=0), 
+                lambda param: param.clamp(max=0), 
+            ],
+            output_modifiers=[lambda output: output] * 2,
+            gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
+            reducer=(lambda inputs, gradients: inputs[0] * gradients[0] + inputs[1] * gradients[1] )
         )
 
 
