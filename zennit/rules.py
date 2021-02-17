@@ -45,12 +45,12 @@ class ZPlus(LinearHook):
     def __init__(self):
         super().__init__(
             input_modifiers=[
-                lambda input: input.clamp(min=0), 
+                lambda input: input.clamp(min=0),
                 lambda input: input.clamp(max=0),
-            ], 
+            ],
             param_modifiers=[
-                lambda param: param.clamp(min=0), 
-                lambda param: param.clamp(max=0), 
+                lambda param: param.clamp(min=0),
+                lambda param: param.clamp(max=0),
             ],
             output_modifiers=[lambda output: output] * 2,
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
@@ -68,33 +68,33 @@ class AlphaBeta(LinearHook):
     beta: float, optional
         Multiplier for the negative output term.
     '''
-    def __init__(self, alpha=2., beta=1.): 
+    def __init__(self, alpha=2., beta=1.):
         if alpha < 0 or beta < 0:
-            raise ValueError("Alpha and Beta parameters have to be positive")
-        if alpha - beta != 1:
-            raise ValueError("Please make sure that alpha - beta == 1")
+            raise ValueError("Both alpha and beta parameters must be positive!")
+        if (alpha - beta) != 1.:
+            raise ValueError("The difference of parameters alpha - beta must equal 1!")
 
         super().__init__(
             input_modifiers=[
-                lambda input: input.clamp(min=0), 
-                lambda input: input.clamp(max=0), 
-                lambda input: input.clamp(min=0), 
-                lambda input: input.clamp(max=0)  
-                ], 
-
+                lambda input: input.clamp(min=0),
+                lambda input: input.clamp(max=0),
+                lambda input: input.clamp(min=0),
+                lambda input: input.clamp(max=0),
+            ],
             param_modifiers=[
-                lambda param: param.clamp(min=0), 
-                lambda param: param.clamp(max=0), 
-                lambda param: param.clamp(max=0), 
-                lambda param: param.clamp(min=0) 
-                ],
-
+                lambda param: param.clamp(min=0),
+                lambda param: param.clamp(max=0),
+                lambda param: param.clamp(max=0),
+                lambda param: param.clamp(min=0),
+            ],
             output_modifiers=[lambda output: output] * 4,
-
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
-      
-            reducer=(lambda inputs, gradients: alpha * (inputs[0] * gradients[0] + inputs[1] * gradients[1]) 
-                - beta * (inputs[2] * gradients[2] + inputs[3] * gradients[3]))
+            reducer=(
+                lambda inputs, gradients: (
+                    alpha * (inputs[0] * gradients[0] + inputs[1] * gradients[1]) -
+                    beta * (inputs[2] * gradients[2] + inputs[3] * gradients[3])
+                )
+            )
         )
 
 
