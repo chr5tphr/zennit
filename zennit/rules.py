@@ -63,6 +63,9 @@ class AlphaBeta(LinearHook):
         Multiplier for the negative output term.
     '''
     def __init__(self, alpha=2., beta=1.): 
+        assert alpha > 0 and beta > 0
+        assert (alpha - beta) == 1
+
         super().__init__(
             input_modifiers=[
                 lambda input: input.clamp(min=0), 
@@ -83,7 +86,7 @@ class AlphaBeta(LinearHook):
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
       
             reducer=(lambda inputs, gradients: alpha * (inputs[0] * gradients[0] + inputs[1] * gradients[1]) 
-                - abs(beta) * (inputs[2] * gradients[2] + inputs[3] * gradients[3]))
+                - beta * (inputs[2] * gradients[2] + inputs[3] * gradients[3]))
         )
 
 
