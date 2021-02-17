@@ -63,8 +63,10 @@ class AlphaBeta(LinearHook):
         Multiplier for the negative output term.
     '''
     def __init__(self, alpha=2., beta=1.): 
-        assert alpha > 0 and beta > 0
-        assert (alpha - beta) == 1
+        if alpha < 0 or beta < 0:
+            raise ValueError("Alpha and Beta parameters have to be positive")
+        if alpha - beta != 1:
+            raise ValueError("Please make sure that alpha - beta == 1")
 
         super().__init__(
             input_modifiers=[
