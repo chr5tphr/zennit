@@ -41,7 +41,15 @@ class Gamma(LinearHook):
 
 
 class ZPlus(LinearHook):
-    '''ZPlus (or alpha=1, beta=0) LRP rule.'''
+    '''ZPlus (or alpha=1, beta=0) LRP rule.
+
+    Notes
+    -----
+    Note that the original deep Taylor Decomposition (DTD) specification of the ZPlus Rule
+    (https://doi.org/10.1016/j.patcog.2016.11.008) only considers positive inputs, as they are used in ReLU Networks.
+    This implementation is effectively alpha=1, beta=0, where negative inputs are allowed.
+    '''
+
     def __init__(self):
         super().__init__(
             input_modifiers=[
