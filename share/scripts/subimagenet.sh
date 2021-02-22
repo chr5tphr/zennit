@@ -177,7 +177,7 @@ command -v curl >/dev/null || die "curl not available!" 1
 command -v file >/dev/null || die "file not available!" 1
 
 mkdir -p "${wnids[@]/#/"$output/"}"
-echo -e "Fetching URLs for \x1b[1m${wnid}\x1b[0m..."
+echo -ne "Fetching URLs for \x1b[1m${wnid}\x1b[0m..."
 fetchtmp="${output}/${wnid}/urls.temp"
 if ! curl \
         'http://www.image-net.org/api/text/imagenet.synset.geturls' \
@@ -185,9 +185,11 @@ if ! curl \
         --get \
         --data-urlencode "wnid=${wnid}" \
         --output "${fetchtmp}"; then
+    echo
     rm -f "$fetchtmp"
     die "Failed to fetch URLs!" 1
 fi
+echo -e "received \x1b[1m$(wc -l "$fetchtmp" | cut -d' ' -f1)\x1b[0m URLs"
 
 mapfile -t urls < <( shuf "$fetchtmp" | tr -d '\r' )
 rm -f "$fetchtmp"
@@ -209,5 +211,5 @@ for url in "${urls[@]}"; do
     fi
 done
 
-echo -e "\nDownloaded ${n_loaded} images to '${output}'"
+echo -e "\nDownloaded ${n_loaded} images to '$(readlink -f "${output}")'"
 exit 0
