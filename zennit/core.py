@@ -1,5 +1,6 @@
 '''Core functions and classes'''
 import functools
+import weakref
 from contextlib import contextmanager
 
 import torch
@@ -101,13 +102,15 @@ class Identity(torch.autograd.Function):
 class Hook:
     '''Base class for hooks to be used to compute layerwise attributions.'''
     def __init__(self):
-        self.grad_output = None
+        self.stored_tensors = {}
 
     def pre_forward(self, module, input):
         '''Apply an Identity to the input before the module to register a backward hook.'''
+        hook_ref = weakref.ref(self)
+
         @functools.wraps(self.backward)
         def wrapper(grad_input, grad_output):
-            return self.backward(module, grad_input, self.grad_output)
+            return hook_ref().backward(module, grad_input, hook_ref().stored_tensors['grad_output'])
 
         output = Identity.apply(input[0])
         output.grad_fn.register_hook(wrapper)
@@ -117,7 +120,7 @@ class Hook:
 
     def pre_backward(self, module, grad_input, grad_output):
         '''Store the grad_output for the backward hook'''
-        self.grad_output = grad_output
+        self.stored_tensors['grad_output'] = grad_output
 
     def forward(self, module, input, output):
         '''Hook applied during forward-pass'''
@@ -130,6 +133,19 @@ class Hook:
         This is used to describe hooks of different modules by a single hook instance.
         '''
         return self.__class__()
+
+    def remove(self):
+        '''When removing hooks, remove all references to stored tensors'''
+        self.stored_tensors.clear()
+
+    def register(self, module):
+        '''Register this instance by registering all hooks to the supplied module.'''
+        return RemovableHandleList([
+            RemovableHandle(self),
+            module.register_forward_pre_hook(self.pre_forward),
+            module.register_forward_hook(self.forward),
+            module.register_backward_hook(self.pre_backward),
+        ])
 
 
 class LinearHook(Hook):
@@ -181,19 +197,17 @@ class LinearHook(Hook):
         self.gradient_mapper = gradient_mapper
         self.reducer = reducer
 
-        self.input = None
-        self.output = None
-
     def forward(self, module, input, output):
         '''Forward hook to save module in-/outputs.'''
-        self.input = input
+        self.stored_tensors['input'] = input
 
     def backward(self, module, grad_input, grad_output):
         '''Backward hook to compute LRP based on the class attributes.'''
+        original_input = self.stored_tensors['input'][0].detach()
         inputs = []
         outputs = []
         for in_mod, param_mod, out_mod in zip(self.input_modifiers, self.param_modifiers, self.output_modifiers):
-            input = in_mod(self.input[0].detach()).requires_grad_()
+            input = in_mod(original_input).requires_grad_()
             with mod_params(module, param_mod) as modified, torch.autograd.enable_grad():
                 output = modified.forward(input)
                 output = out_mod(output)
@@ -227,6 +241,18 @@ class LinearHook(Hook):
     @staticmethod
     def _default_reducer(inputs, gradients):
         return sum(input * gradient for input, gradient in zip(inputs, gradients))
+
+
+class RemovableHandle:
+    '''Create weak reference to call .remove on some instance.'''
+    def __init__(self, instance):
+        self.instance_ref = weakref.ref(instance)
+
+    def remove(self):
+        '''Call remove on weakly reference instance if it still exists.'''
+        instance = self.instance_ref()
+        if instance is not None:
+            instance.remove()
 
 
 class RemovableHandleList(list):
@@ -301,9 +327,7 @@ class Composite:
             template = self.module_map(ctx, name, child)
             if template is not None:
                 hook = template.copy()
-                self.handles.append(child.register_forward_pre_hook(hook.pre_forward))
-                self.handles.append(child.register_forward_hook(hook.forward))
-                self.handles.append(child.register_backward_hook(hook.pre_backward))
+                self.handles.append(hook.register(child))
 
     def remove(self):
         '''Remove all handles for hooks and canonizers.
