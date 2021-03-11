@@ -107,6 +107,10 @@ def main(
     model.to(device)
     model.eval()
 
+    # disable requires_grad for all parameters, we do not need their modified gradients
+    for param in model.parameters():
+        param.requires_grad = False
+
     # convenience identity matrix to produce one-hot encodings
     eye = torch.eye(n_outputs, device=device)
 
