@@ -12,6 +12,19 @@ Zennit is currently under development and has not yet reached a stable state.
 Interfaces may change suddenly and without warning, so please be careful when attempting to use Zennit in its current
 state.
 
+## Install
+
+To install directly using pip, use:
+```shell
+$ pip install 'git+git://github.com/chr5tphr/zennit'
+```
+
+Alternatively, install from a manually cloned repository to try out the examples:
+```shell
+$ git clone git@github.com:chr5tphr/zennit.git
+$ pip install ./zennit
+```
+
 ## Usage
 An example can be found in `share/example/feed_forward.py`.
 Currently, only feed-forward type models are supported.
