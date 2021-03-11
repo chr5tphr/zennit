@@ -25,37 +25,52 @@ def stabilize(input, epsilon=1e-6):
 
 
 @contextmanager
-def mod_params(module, modifier):
-    '''Context manager to temporarily modify `weight` and `bias` attributes of a linear layer, or the identity of the
-    module when `modifier` is `None`.
+def mod_params(module, modifier, param_keys=None, require_params=True):
+    '''Context manager to temporarily modify parameter attributes (all by default) of a module.
 
     Parameters
     ----------
     module: obj:`torch.nn.Module`
-        Linear layer with mandatory attributes `weight` and `bias`, or any module if `modifier` is `None`
+        Module of which to modify parameters. If `requires_params` is `True`, it must have all elements given in
+        `param_keys` as attributes (attributes are allowed to be `None`, in which case they are ignored).
     modifier: function
-        A function to modify attributes `weight` and `bias`, or `None`.
+        A function used to modify parameter attributes. If `param_keys` is empty, this is not used.
+    param_keys: list[str], optional
+        A list of parameters that shall be modified. If `None` (default), all parameters are modified (which may be
+        none). If `[]`, no parameters are modified and `modifier` is ignored.
+    require_params: bool, optional
+        Whether existance of `module`'s params is mandatory (True by default). If the attribute exists but is `None`,
+        it is not considered missing, and the modifier is not applied.
+
+    Raises
+    ------
+    RuntimeError
+        If `require_params` is `True` and `module` is missing an attribute listed in `param_keys`.
 
     Yields
     ------
     module: obj:`torch.nn.Module`
-        The input temporarily modified linear layer `module`.
+        The `module` with appropriate parameters temporarily modified.
     '''
     try:
-        if modifier is not None:
-            if module.weight is not None:
-                original_weight = module.weight.data
-                module.weight.data = modifier(module.weight.data)
-            if module.bias is not None:
-                original_bias = module.bias.data
-                module.bias.data = modifier(module.bias.data)
+        stored_tensors = {}
+        if param_keys is None:
+            param_keys = [name for name, _ in module.named_parameters(recurse=False)]
+
+        missing = [key for key in param_keys if not hasattr(module, key)]
+        if require_params and missing:
+            raise RuntimeError('Module {} requires missing parameters: \'{}\''.format(module, '\', \''.join(missing)))
+
+        for key in param_keys:
+            if key not in missing:
+                param = getattr(module, key)
+                if param is not None:
+                    stored_tensors[key] = param.data
+                    param.data = modifier(param.data)
         yield module
     finally:
-        if modifier is not None:
-            if module.weight is not None:
-                module.weight.data = original_weight
-            if module.bias is not None:
-                module.bias.data = original_bias
+        for key, value in stored_tensors.items():
+            getattr(module, key).data = value
 
 
 def collect_leaves(module):
@@ -167,6 +182,12 @@ class LinearHook(Hook):
         Function to reduce all the inputs and gradients produced through `input_modifiers` and `param_modifiers`.
         Call signature is of form `(inputs, gradients)`, where `inputs` and `gradients` have the same as
         `input_modifiers` and `param_modifiers`
+    param_keys: list[str], optional
+        A list of parameters that shall be modified. If `None` (default), all parameters are modified (which may be
+        none). If `[]`, no parameters are modified and `modifier` is ignored.
+    require_params: bool, optional
+        Whether existance of `module`'s params is mandatory (True by default). If the attribute exists but is `None`,
+        it is not considered missing, and the modifier is not applied.
     '''
     def __init__(
         self,
@@ -174,7 +195,9 @@ class LinearHook(Hook):
         param_modifiers=None,
         output_modifiers=None,
         gradient_mapper=None,
-        reducer=None
+        reducer=None,
+        param_keys=None,
+        require_params=True
     ):
         super().__init__()
         modifiers = {
@@ -197,6 +220,9 @@ class LinearHook(Hook):
         self.gradient_mapper = gradient_mapper
         self.reducer = reducer
 
+        self.param_keys = param_keys
+        self.require_params = require_params
+
     def forward(self, module, input, output):
         '''Forward hook to save module in-/outputs.'''
         self.stored_tensors['input'] = input
@@ -204,11 +230,12 @@ class LinearHook(Hook):
     def backward(self, module, grad_input, grad_output):
         '''Backward hook to compute LRP based on the class attributes.'''
         original_input = self.stored_tensors['input'][0].detach()
+        param_kwargs = dict(param_keys=self.param_keys, require_params=self.require_params)
         inputs = []
         outputs = []
         for in_mod, param_mod, out_mod in zip(self.input_modifiers, self.param_modifiers, self.output_modifiers):
             input = in_mod(original_input).requires_grad_()
-            with mod_params(module, param_mod) as modified, torch.autograd.enable_grad():
+            with mod_params(module, param_mod, **param_kwargs) as modified, torch.autograd.enable_grad():
                 output = modified.forward(input)
                 output = out_mod(output)
             inputs.append(input)
@@ -227,7 +254,9 @@ class LinearHook(Hook):
             self.param_modifiers,
             self.output_modifiers,
             self.gradient_mapper,
-            self.reducer
+            self.reducer,
+            self.param_keys,
+            self.require_params
         )
 
     @staticmethod

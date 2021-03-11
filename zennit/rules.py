@@ -62,7 +62,7 @@ class ZPlus(LinearHook):
             ],
             output_modifiers=[lambda output: output] * 2,
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
-            reducer=(lambda inputs, gradients: inputs[0] * gradients[0] + inputs[1] * gradients[1] )
+            reducer=(lambda inputs, gradients: inputs[0] * gradients[0] + inputs[1] * gradients[1])
         )
 
 
@@ -157,7 +157,8 @@ class Norm(LinearHook):
             param_modifiers=[None],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
-            reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
+            reducer=(lambda inputs, gradients: inputs[0] * gradients[0]),
+            param_keys=[]
         )
 
 
@@ -182,5 +183,6 @@ class Flat(LinearHook):
             param_modifiers=[torch.ones_like],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
-            reducer=(lambda inputs, gradients: gradients[0])
+            reducer=(lambda inputs, gradients: gradients[0]),
+            require_params=False
         )
