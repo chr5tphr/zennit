@@ -61,6 +61,9 @@ $ python share/example/feed_forward.py \
 ```
 which computes the lrp heatmaps according to the `epsilon_gamma_box` rule and stores them in `share/results`, along with the respective input images.
 
+The resulting heatmaps may look like the following:
+![beacon heatmaps](share/img/beacon_vgg16_epsilon_gamma_box.png)
+
 The following is a slightly modified exerpt of `share/example/feed_forward.py`:
 ```python
 ...
@@ -76,6 +79,10 @@ The following is a slightly modified exerpt of `share/example/feed_forward.py`:
     # create a composite specified by a name; the COMPOSITES dict includes all preset composites
     # provided by zennit.
     composite = COMPOSITES['epsilon_gamma_box'](**composite_kwargs)
+
+    # disable requires_grad for all parameters, we do not need their modified gradients
+    for param in model.parameters():
+        param.requires_grad = False
 
     # create the composite context outside the main loop, such that the canonizers and hooks do not
     # need to be registered and removed for each step.
