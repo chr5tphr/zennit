@@ -1,10 +1,10 @@
 '''Rules based on Hooks'''
 import torch
 
-from .core import Hook, LinearHook, stabilize
+from .core import Hook, BasicHook, stabilize
 
 
-class Epsilon(LinearHook):
+class Epsilon(BasicHook):
     '''Epsilon LRP rule.
 
     Parameters
@@ -22,7 +22,7 @@ class Epsilon(LinearHook):
         )
 
 
-class Gamma(LinearHook):
+class Gamma(BasicHook):
     '''Gamma LRP rule.
 
     Parameters
@@ -40,7 +40,7 @@ class Gamma(LinearHook):
         )
 
 
-class ZPlus(LinearHook):
+class ZPlus(BasicHook):
     '''ZPlus (or alpha=1, beta=0) LRP rule.
 
     Notes
@@ -66,7 +66,7 @@ class ZPlus(LinearHook):
         )
 
 
-class AlphaBeta(LinearHook):
+class AlphaBeta(BasicHook):
     '''AlphaBeta LRP rule.
 
     Parameters
@@ -106,7 +106,7 @@ class AlphaBeta(LinearHook):
         )
 
 
-class ZBox(LinearHook):
+class ZBox(BasicHook):
     '''ZBox LRP rule for input pixel space.
 
     Parameters
@@ -146,7 +146,7 @@ class Pass(Hook):
         return grad_output
 
 
-class Norm(LinearHook):
+class Norm(BasicHook):
     '''Normalize and weigh relevance by input contribution.
     This is essentially the same as the LRP Epsilon Rule with a fixed epsilon only used as a stabilizer, and without
     the need of the attached layer to have parameters `weight` and `bias`.
@@ -162,7 +162,7 @@ class Norm(LinearHook):
         )
 
 
-class WSquare(LinearHook):
+class WSquare(BasicHook):
     '''This is the WSquare LRP rule.'''
     def __init__(self):
         super().__init__(
@@ -174,7 +174,7 @@ class WSquare(LinearHook):
         )
 
 
-class Flat(LinearHook):
+class Flat(BasicHook):
     '''This is the Flat LRP rule. It is essentially the same as the WSquare Rule, but with all parameters set to ones.
     '''
     def __init__(self):
