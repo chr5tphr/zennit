@@ -163,25 +163,30 @@ class Hook:
         ])
 
 
-class LinearHook(Hook):
-    '''A hook to compute the layerwise attribution of the layer it is attached to.
-    A `LinearHook` instance may only be registered with a single module.
+class BasicHook(Hook):
+    '''A hook to compute the layerwise attribution of the module it is attached to.
+    A `BasicHook` instance may only be registered with a single module.
 
     Parameters
     ----------
-    input_modifiers: list of function
-        A list of functions to produce multiple inputs.
-    param_modifiers: list of function
-        A list of functions to temporarily modify the parameters of the attached linear layer for each input produced
-        with `input_modifiers`.
-    gradient_mapper: function
+    input_modifiers: list[callable], optional
+        A list of functions to produce multiple inputs. Default is a single input which is the identity.
+    param_modifiers: list[callable], optional
+        A list of functions to temporarily modify the parameters of the attached module for each input produced
+        with `input_modifiers`. Default is unmodified parameters for each input.
+    output_modifiers: list[callable], optional
+        A list of functions to modify the module's output computed using the modified parameters before gradient
+        computation for each input produced with `input_modifier`. Default is the identity for each output.
+    gradient_mapper: callable, optional
         Function to modify upper relevance. Call signature is of form `(grad_output, outputs)` and a tuple of
         the same size as outputs is expected to be returned. `outputs` has the same size as `input_modifiers` and
-        `param_modifiers`.
-    reducer: function
+        `param_modifiers`. Default is a stabilized normalization by each of the outputs, multiplied with the output
+        gradient.
+    reducer: callable
         Function to reduce all the inputs and gradients produced through `input_modifiers` and `param_modifiers`.
         Call signature is of form `(inputs, gradients)`, where `inputs` and `gradients` have the same as
-        `input_modifiers` and `param_modifiers`
+        `input_modifiers` and `param_modifiers`. Default is the sum of the multiplications of each input and its
+        corresponding gradient.
     param_keys: list[str], optional
         A list of parameters that shall be modified. If `None` (default), all parameters are modified (which may be
         none). If `[]`, no parameters are modified and `modifier` is ignored.
@@ -206,7 +211,7 @@ class LinearHook(Hook):
             'out': output_modifiers,
         }
         supplied = {key for key, val in modifiers.items() if val is not None}
-        num_mods = len(next(iter(supplied), (None,)))
+        num_mods = len(modifiers[next(iter(supplied))]) if supplied else 1
         modifiers.update({key: (self._default_modifier,) * num_mods for key in set(modifiers) - supplied})
 
         if gradient_mapper is None:
@@ -249,7 +254,7 @@ class LinearHook(Hook):
         '''Return a copy of this hook.
         This is used to describe hooks of different modules by a single hook instance.
         '''
-        return LinearHook(
+        return BasicHook(
             self.input_modifiers,
             self.param_modifiers,
             self.output_modifiers,
@@ -321,9 +326,9 @@ class Composite:
 
     Parameters
     ----------
-    module_map: list[function, Hook]]
-        A mapping from functions that check applicability of hooks to hook instances that shall be applied to instances
-        of applicable modules.
+    module_map: callable
+        A function `(ctx: dict, name: str, module: torch.nn.Module) -> Hook or None` which
+
     canonizers: list[Canonizer]
         List of canonizer instances to be applied before applying hooks.
     '''

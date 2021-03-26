@@ -31,7 +31,7 @@ Currently, only feed-forward type models are supported.
 
 At its heart, Zennit registers hooks at PyTorch's Module level, to modify the backward pass to produce LRP
 attributions (instead of the usual gradient).
-All rules are implemented as hooks (`zennit/rules.py`) and most use the basic `LinearHook` (`zennit/core.py`).
+All rules are implemented as hooks (`zennit/rules.py`) and most use the LRP-specific `BasicHook` (`zennit/core.py`).
 **Composites** are a way of choosing the right hook for the right layer.
 In addition to the abstract **NameMapComposite**, which assigns hooks to layers by name, and **LayerMapComposite**,
 which assigns hooks to layers based on their Type, there exist explicit Composites, which currently are
