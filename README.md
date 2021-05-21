@@ -21,7 +21,7 @@ $ pip install 'git+git://github.com/chr5tphr/zennit'
 
 Alternatively, install from a manually cloned repository to try out the examples:
 ```shell
-$ git clone git@github.com:chr5tphr/zennit.git
+$ git clone https://github.com/chr5tphr/zennit.git
 $ pip install ./zennit
 ```
 
