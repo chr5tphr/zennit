@@ -98,6 +98,13 @@ def cy_bk_mg(x):
     '''
     return bk_mg((2 * x - 1.).clip(0., 1.)) + bk_cy(-(2 * x - 1.).clip(-1., 0.))
 
+@register_cmap('mg_bk_cy')
+def cy_bk_mg(x):
+    '''Combination of color maps bk_mg (reversed) and bk_cy.
+    Colors range from magenta to black to cyan.
+    '''
+    return bk_cy((2 * x - 1.).clip(0., 1.)) + bk_mg(-(2 * x - 1.).clip(-1., 0.))
+
 @register_cmap('yl_bk_mg')
 def yl_bk_mg(x):
     '''Combination of color maps bk_yl (reversed) and bk_mg.
