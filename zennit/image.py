@@ -33,26 +33,80 @@ def wblue(x):
     '''Color map from white to blue.'''
     return np.stack([1. - x, 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
 
+@register_cmap('bmagenta')
+def bmagenta(x):
+    '''Color map from black to magenta.'''
+    return np.stack([1. * x, 0. * x, 1. * x], axis=-1).clip(0., 1.)
+
+@register_cmap('byellow')
+def byellow(x):
+    '''Color map from black to yellow.'''
+    return np.stack([1. * x, 1. * x, 0. * x], axis=-1).clip(0., 1.)
+
+@register_cmap('borange')
+def borange(x):
+    '''Color map from black to yellow.'''
+    return np.stack([2. * x, 2. * x - 1, 0. * x], axis=-1).clip(0., 1.)
+
+@register_cmap('bcyan')
+def bcyan(x):
+    '''Color map from black to cyan.'''
+    return np.stack([0. * x, 1. * x, 1. * x], axis=-1).clip(0., 1.)
 
 @register_cmap('hot')
 def hot(x):
     '''Color map from black to red to yellow to white.'''
     return np.stack([x * 3., x * 3. - 1, x * 3 - 2], axis=-1).clip(0., 1.)
 
-
 @register_cmap('cold')
 def cold(x):
     '''Color map from black to blue to cyan.'''
     return np.stack([0. * x, x * 2. - 1., x * 2], axis=-1).clip(0., 1.)
 
+@register_cmap('bpurmag')
+def bpurmag(x):
+    '''Color map from black to purple to magenta.'''
+    return np.stack([x * 2. - 1., 0. * x, x * 2], axis=-1).clip(0., 1.)
+
+@register_cmap('bgrecy')
+def bgrecy(x):
+    '''Color map from black to green to cyan.'''
+    return np.stack([0. * x, x * 2, x * 2. - 1], axis=-1).clip(0., 1.)
 
 @register_cmap('coldnhot')
 def coldnhot(x):
-    '''Combination of color maps cold (reveresed) and hot.
+    '''Combination of color maps cold (reversed) and hot.
     Colors range from cyan to blue to black to red to yellow to white.
     '''
     return hot((2 * x - 1.).clip(0., 1.)) + cold(-(2 * x - 1.).clip(-1., 0.))
 
+@register_cmap('cygrbpumag')
+def turbmag(x):
+    '''Combination of color maps bgrecy (reversed) and bpurmag
+    Colors range from cyan to green to black to purple to magenta.
+    '''
+    return bpurmag((2 * x - 1.).clip(0., 1.)) + bgrecy(-(2 * x - 1.).clip(-1., 0.))
+
+@register_cmap('magpubgrcy')
+def magbcy(x):
+    '''Combination of color maps bpurmag (reversed) and bgrecy.
+    Colors range from magenta to purple to black to green to cyan.
+    '''
+    return bgrecy((2 * x - 1.).clip(0., 1.)) + bpurmag(-(2 * x - 1.).clip(-1., 0.))
+
+@register_cmap('cybmag')
+def cybmag(x):
+    '''Combination of color maps bcyan (reversed) and bmagenta.
+    Colors range from cyan to black to magenta.
+    '''
+    return bmagenta((2 * x - 1.).clip(0., 1.)) + bcyan(-(2 * x - 1.).clip(-1., 0.))
+
+@register_cmap('yebmag')
+def cybmag(x):
+    '''Combination of color maps byellow (reversed) and bmagenta.
+    Colors range from yellow to black to magenta.
+    '''
+    return bmagenta((2 * x - 1.).clip(0., 1.)) + byellow(-(2 * x - 1.).clip(-1., 0.))
 
 @register_cmap('bwr')
 def bwr(x):
@@ -60,7 +114,6 @@ def bwr(x):
     Colors range from blue to white to red.
     '''
     return wred((2 * x - 1.).clip(0., 1.)) + wblue(-(2 * x - 1.).clip(-1., 0.)) - 1.
-
 
 def palette(cmap='bwr', level=1.0):
     '''Create a 8-bit palette.
