@@ -1,6 +1,4 @@
 '''A quick example to generate heatmaps for vgg16.'''
-import json
-
 import click
 import torch
 import numpy as np
