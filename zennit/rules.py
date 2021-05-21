@@ -99,8 +99,8 @@ class AlphaBeta(BasicHook):
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
             reducer=(
                 lambda inputs, gradients: (
-                    alpha * (inputs[0] * gradients[0] + inputs[1] * gradients[1]) -
-                    beta * (inputs[2] * gradients[2] + inputs[3] * gradients[3])
+                    alpha * (inputs[0] * gradients[0] + inputs[1] * gradients[1])
+                    - beta * (inputs[2] * gradients[2] + inputs[3] * gradients[3])
                 )
             )
         )
