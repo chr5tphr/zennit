@@ -168,24 +168,24 @@ def bu_wh_rd(x):
     return wh_rd((2 * x - 1.).clip(0., 1.)) + wh_bu(-(2 * x - 1.).clip(-1., 0.)) - 1.
 
 
-@register_cmap('bu_wh_rd_085')
-def bu_wh_rd_085(x):
+@register_cmap('france')
+def france(x):
     '''Combination of color maps wh_bu (reveresed) and wh_rd (factor 0.85).
     Colors range from blue to white to red.
     '''
     return 0.85 * (wh_rd((2 * x - 1.).clip(0., 1.)) + wh_bu(-(2 * x - 1.).clip(-1., 0.)) - 1.)
 
 
-@register_cmap('pu_wh_gn_085')
-def pu_wh_gn_085(x):
+@register_cmap('coleus')
+def coleus(x):
     '''Combination of color maps wh_pu (reveresed) and wh_gn (factor 0.85).
     Colors range from purple to white to green.
     '''
     return 0.85 * (wh_gn((2 * x - 1.).clip(0., 1.)) + wh_pu(-(2 * x - 1.).clip(-1., 0.)) - 1.)
 
 
-@register_cmap('cy_wh_mg_085')
-def cy_wh_mg_085(x):
+@register_cmap('coolio')
+def coolio(x):
     '''Combination of color maps wh_cy (reveresed) and wh_mg (factor 0.85).
     Colors range from cyan to white to magenta.
     '''
