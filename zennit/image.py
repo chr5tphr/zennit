@@ -15,60 +15,102 @@ def register_cmap(name):
 
     return wrapped
 
+
 @register_cmap('gray')
 def gray(x):
     '''Color map from black to white.'''
     return np.stack([x] * 3, axis=-1).clip(0., 1.)
+
 
 @register_cmap('wh_rd')
 def wh_rd(x):
     '''Color map from white to red.'''
     return np.stack([0. * x + 1., 1. - x, 1. - x], axis=-1).clip(0., 1.)
 
+
 @register_cmap('wh_bu')
 def wh_bu(x):
     '''Color map from white to blue.'''
     return np.stack([1. - x, 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
+
+
+@register_cmap('wh_pu')
+def wh_pu(x):
+    '''Color map from white to purple.'''
+    return np.stack([1. - x, 0 * x + 1., 1. - 0.5 * x], axis=-1).clip(0., 1.)
+
+
+@register_cmap('wh_gn')
+def wh_gn(x):
+    '''Color map from white to green.'''
+    return np.stack([0 * x + 1., 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
+
+
+@register_cmap('wh_mg')
+def wh_mg(x):
+    '''Color map from white to magenta.'''
+    return np.stack([0 * x + 1., 1 - x, 0 * x + 1.], axis=-1).clip(0., 1.)
+
+
+@register_cmap('wh_cy')
+def wh_cy(x):
+    '''Color map from white to cyan.'''
+    return np.stack([1 - x, 0 * x + 1., 0 * x + 1.], axis=-1).clip(0., 1.)
+
+
+@register_cmap('wh_bu')
+def wh_bu(x):
+    '''Color map from white to blue.'''
+    return np.stack([1. - x, 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
+
 
 @register_cmap('bk_mg')
 def bk_mg(x):
     '''Color map from black to magenta.'''
     return np.stack([1. * x, 0. * x, 1. * x], axis=-1).clip(0., 1.)
 
+
 @register_cmap('bk_yl')
 def bk_yl(x):
     '''Color map from black to yellow.'''
     return np.stack([1. * x, 1. * x, 0. * x], axis=-1).clip(0., 1.)
+
 
 @register_cmap('bk_or')
 def bk_or(x):
     '''Color map from black to orange.'''
     return np.stack([2. * x, 2. * x - 1, 0. * x], axis=-1).clip(0., 1.)
 
+
 @register_cmap('bk_cy')
 def bk_cy(x):
     '''Color map from black to cyan.'''
     return np.stack([0. * x, 1. * x, 1. * x], axis=-1).clip(0., 1.)
+
 
 @register_cmap('hot')
 def hot(x):
     '''Color map from black to red to yellow to white.'''
     return np.stack([x * 3., x * 3. - 1, x * 3 - 2], axis=-1).clip(0., 1.)
 
+
 @register_cmap('cold')
 def cold(x):
     '''Color map from black to blue to cyan.'''
     return np.stack([0. * x, x * 2. - 1., x * 2], axis=-1).clip(0., 1.)
+
 
 @register_cmap('bk_pu_mg')
 def bk_pu_mg(x):
     '''Color map from black to purple to magenta.'''
     return np.stack([x * 2. - 1., 0. * x, x * 2], axis=-1).clip(0., 1.)
 
+
 @register_cmap('bk_gn_cy')
 def bk_gn_cy(x):
     '''Color map from black to green to cyan.'''
     return np.stack([0. * x, x * 2, x * 2. - 1], axis=-1).clip(0., 1.)
+
 
 @register_cmap('coldnhot')
 def coldnhot(x):
@@ -77,12 +119,14 @@ def coldnhot(x):
     '''
     return hot((2 * x - 1.).clip(0., 1.)) + cold(-(2 * x - 1.).clip(-1., 0.))
 
+
 @register_cmap('cy_gn_bk_pu_mg')
 def cy_gn_bk_pu_mg(x):
     '''Combination of color maps bk_gn_cy (reversed) and bk_pu_mg
     Colors range from cyan to green to black to purple to magenta.
     '''
     return bk_pu_mg((2 * x - 1.).clip(0., 1.)) + bk_gn_cy(-(2 * x - 1.).clip(-1., 0.))
+
 
 @register_cmap('mg_pu_bk_gr_cy')
 def mg_pu_bk_gr_cy(x):
@@ -91,12 +135,14 @@ def mg_pu_bk_gr_cy(x):
     '''
     return bk_gn_cy((2 * x - 1.).clip(0., 1.)) + bk_pu_mg(-(2 * x - 1.).clip(-1., 0.))
 
+
 @register_cmap('cy_bk_mg')
 def cy_bk_mg(x):
     '''Combination of color maps bk_cy (reversed) and bk_mg.
     Colors range from cyan to black to magenta.
     '''
     return bk_mg((2 * x - 1.).clip(0., 1.)) + bk_cy(-(2 * x - 1.).clip(-1., 0.))
+
 
 @register_cmap('mg_bk_cy')
 def cy_bk_mg(x):
@@ -105,6 +151,7 @@ def cy_bk_mg(x):
     '''
     return bk_cy((2 * x - 1.).clip(0., 1.)) + bk_mg(-(2 * x - 1.).clip(-1., 0.))
 
+
 @register_cmap('yl_bk_mg')
 def yl_bk_mg(x):
     '''Combination of color maps bk_yl (reversed) and bk_mg.
@@ -112,12 +159,38 @@ def yl_bk_mg(x):
     '''
     return bk_mg((2 * x - 1.).clip(0., 1.)) + bk_yl(-(2 * x - 1.).clip(-1., 0.))
 
+
 @register_cmap('bu_wh_rd')
 def bu_wh_rd(x):
     '''Combination of color maps wh_bu (reveresed) and wh_rd.
     Colors range from blue to white to red.
     '''
     return wh_rd((2 * x - 1.).clip(0., 1.)) + wh_bu(-(2 * x - 1.).clip(-1., 0.)) - 1.
+
+
+@register_cmap('bu_wh_rd_085')
+def bu_wh_rd_085(x):
+    '''Combination of color maps wh_bu (reveresed) and wh_rd (factor 0.85).
+    Colors range from blue to white to red.
+    '''
+    return 0.85 * (wh_rd((2 * x - 1.).clip(0., 1.)) + wh_bu(-(2 * x - 1.).clip(-1., 0.)) - 1.)
+
+
+@register_cmap('pu_wh_gn_085')
+def pu_wh_gn_085(x):
+    '''Combination of color maps wh_pu (reveresed) and wh_gn (factor 0.85).
+    Colors range from purple to white to green.
+    '''
+    return 0.85 * (wh_gn((2 * x - 1.).clip(0., 1.)) + wh_pu(-(2 * x - 1.).clip(-1., 0.)) - 1.)
+
+
+@register_cmap('cy_wh_mg_085')
+def cy_wh_mg_085(x):
+    '''Combination of color maps wh_cy (reveresed) and wh_mg (factor 0.85).
+    Colors range from cyan to white to magenta.
+    '''
+    return 0.85 * (wh_mg((2 * x - 1.).clip(0., 1.)) + wh_cy(-(2 * x - 1.).clip(-1., 0.)) - 1.)
+
 
 def palette(cmap='bu_wh_rd', level=1.0):
     '''Create a 8-bit palette.
