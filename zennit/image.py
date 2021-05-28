@@ -2,6 +2,8 @@
 import numpy as np
 from PIL import Image
 
+import matplotlib.cm
+
 
 CMAPS = {}
 
@@ -34,16 +36,10 @@ def wh_bu(x):
     return np.stack([1. - x, 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
 
 
-@register_cmap('wh_pu')
-def wh_pu(x):
-    '''Color map from white to purple.'''
-    return np.stack([1. - x, 0 * x + 1., 1. - 0.5 * x], axis=-1).clip(0., 1.)
-
-
 @register_cmap('wh_gn')
 def wh_gn(x):
     '''Color map from white to green.'''
-    return np.stack([0 * x + 1., 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
+    return np.stack([1. - x, 0 * x + 1., 1. - 0.5 * x], axis=-1).clip(0., 1.)
 
 
 @register_cmap('wh_mg')
@@ -178,18 +174,28 @@ def france(x):
 
 @register_cmap('coleus')
 def coleus(x):
-    '''Combination of color maps wh_pu (reveresed) and wh_gn (factor 0.85).
-    Colors range from purple to white to green.
+    '''Combination of color maps wh_gn (reveresed) and wh_mg (factor 0.85).
+    Colors range from magenta to grey to green.
     '''
-    return 0.85 * (wh_gn((2 * x - 1.).clip(0., 1.)) + wh_pu(-(2 * x - 1.).clip(-1., 0.)) - 1.)
+    return 0.85 * (wh_mg((2 * x - 1.).clip(0., 1.)) + wh_gn(-(2 * x - 1.).clip(-1., 0.)) - 1.)
 
 
 @register_cmap('coolio')
 def coolio(x):
     '''Combination of color maps wh_cy (reveresed) and wh_mg (factor 0.85).
-    Colors range from cyan to white to magenta.
+    Colors range from cyan to grey to magenta.
     '''
     return 0.85 * (wh_mg((2 * x - 1.).clip(0., 1.)) + wh_cy(-(2 * x - 1.).clip(-1., 0.)) - 1.)
+
+
+@register_cmap('PRGn085')
+def prgn085(x):
+    '''
+    Seismic, but sucks less.
+    '''
+    tmp = matplotlib.cm.get_cmap('PRGn')(x)
+    tmp = tmp[..., 0:3] * 0.85
+    return tmp[::-1]
 
 
 def palette(cmap='bu_wh_rd', level=1.0):
