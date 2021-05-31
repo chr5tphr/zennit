@@ -51,7 +51,7 @@ def wh_mg(x):
 @register_cmap('wh_cy')
 def wh_cy(x):
     '''Color map from white to cyan.'''
-    return np.stack([1. - 230/255*x, 1. - 40/255*x, 1. - 55/255*x], axis=-1).clip(0., 1.)
+    return np.stack([1. - 230 / 255 * x, 1. - 40 / 255 * x, 1. - 55 / 255 * x], axis=-1).clip(0., 1.)
 
 
 @register_cmap('wh_bu')
