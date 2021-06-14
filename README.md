@@ -1,5 +1,5 @@
 # Zennit
-![Zennit-Logo](share/img/zennit.png)
+![Zennit-Logo](https://raw.githubusercontent.com/chr5tphr/zennit/d3934e974bb7c685fc929786d6fc653474fbbc98/share/img/zennit.png)
 
 
 Zennit (**Z**ennit **e**xplains **n**eural **n**etworks **i**n **t**orch)
@@ -75,7 +75,7 @@ $ python share/example/feed_forward.py \
 which computes the lrp heatmaps according to the `epsilon_gamma_box` rule and stores them in `share/results`, along with the respective input images.
 
 The resulting heatmaps may look like the following:
-![beacon heatmaps](share/img/beacon_vgg16_epsilon_gamma_box.png)
+![beacon heatmaps](https://raw.githubusercontent.com/chr5tphr/zennit/d3934e974bb7c685fc929786d6fc653474fbbc98/share/img/beacon_vgg16_epsilon_gamma_box.png)
 
 The following is a slightly modified exerpt of `share/example/feed_forward.py`:
 ```python
