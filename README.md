@@ -1,5 +1,5 @@
 # Zennit
-![Zennit-Logo](https://raw.githubusercontent.com/chr5tphr/zennit/d3934e974bb7c685fc929786d6fc653474fbbc98/share/img/zennit.png)
+![Zennit-Logo](https://raw.githubusercontent.com/chr5tphr/zennit/master/share/img/zennit.png)
 
 
 Zennit (**Z**ennit **e**xplains **n**eural **n**etworks **i**n **t**orch)
@@ -14,9 +14,9 @@ state.
 
 ## Install
 
-To install directly using pip, use:
+To install directly from PyPI using pip, use:
 ```shell
-$ pip install 'git+git://github.com/chr5tphr/zennit'
+$ pip install zennit
 ```
 
 Alternatively, install from a manually cloned repository to try out the examples:
@@ -54,28 +54,42 @@ applicable modules, e.g. for ResNet50, the forward function (attribute) of the
 Bottleneck modules is overwritten to handle the residual connection.
 
 ## Example
-Prepare the data needed for the example (requires cURL and (magic-)file):
-```shell
-$ mkdir -p share/params share/data share/results
-$ bash share/scripts/subimagenet.sh --n-total 8 --wnid n02814860 --output share/data/tiny_imagenet
-$ curl -o share/params/vgg16-397923af.pth 'https://download.pytorch.org/models/vgg16-397923af.pth'
-```
-This creates the needed directories and downloads the pre-trained vgg16 parameters and a tiny subset of imagenet with the required label-directory structure and 8 samples of class *beacon* (n02814860).
+This example requires bash, cURL and (magic-)file.
 
-The example at `share/example/feed_forward.py` may then be run using:
+Create a virtual environment, install Zennit and download the example scripts:
 ```shell
-$ python share/example/feed_forward.py \
-    share/data/tiny_imagenet \
-    'share/results/vgg16_epsilon_gamma_box_{sample:02d}.png' \
-    --inputs 'share/results/vgg16_input_{sample:02d}.png' \
-    --parameters share/params/vgg16-397923af.pth \
+$ mkdir zennit-example
+$ cd zennit-example
+$ python -m venv .venv
+$ .venv/bin/pip install zennit
+$ curl -o feed_forward.py \
+    'https://raw.githubusercontent.com/chr5tphr/zennit/master/share/example/feed_forward.py'
+$ curl -o download-lighthouses.sh \
+    'https://raw.githubusercontent.com/chr5tphr/zennit/master/share/scripts/download-lighthouses.sh'
+```
+
+Prepare the data needed for the example :
+```shell
+$ mkdir params data results
+$ bash download-lighthouses.sh --output data/lighthouses
+$ curl -o params/vgg16-397923af.pth 'https://download.pytorch.org/models/vgg16-397923af.pth'
+```
+This creates the needed directories and downloads the pre-trained vgg16 parameters and 8 images of light houses from wikimedia commons into the required label-directory structure for the imagenet dataset in Pytorch.
+
+The `feed_forward.py` example may then be run using:
+```shell
+$ .venv/bin/python feed_forward.py \
+    data/lighthouses \
+    'results/vgg16_epsilon_gamma_box_{sample:02d}.png' \
+    --inputs 'results/vgg16_input_{sample:02d}.png' \
+    --parameters params/vgg16-397923af.pth \
     --model vgg16 \
     --composite epsilon_gamma_box
 ```
-which computes the lrp heatmaps according to the `epsilon_gamma_box` rule and stores them in `share/results`, along with the respective input images.
+which computes the lrp heatmaps according to the `epsilon_gamma_box` rule and stores them in `results`, along with the respective input images.
 
 The resulting heatmaps may look like the following:
-![beacon heatmaps](https://raw.githubusercontent.com/chr5tphr/zennit/d3934e974bb7c685fc929786d6fc653474fbbc98/share/img/beacon_vgg16_epsilon_gamma_box.png)
+![beacon heatmaps](https://raw.githubusercontent.com/chr5tphr/zennit/master/share/img/beacon_vgg16_epsilon_gamma_box.png)
 
 The following is a slightly modified exerpt of `share/example/feed_forward.py`:
 ```python
