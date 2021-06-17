@@ -7,6 +7,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor
 from torchvision.datasets import ImageFolder
 from torchvision.models import vgg16, vgg16_bn, resnet50
 
+from zennit.attribution import Gradient
 from zennit.composites import COMPOSITES
 from zennit.image import imsave, CMAPS
 from zennit.torchvision import VGGCanonizer, ResNetCanonizer
@@ -128,41 +129,48 @@ def main(
     composite = COMPOSITES[composite_name](**composite_kwargs)
 
     # the current sample index for creating file names
-    sample = 0
+    sample_index = 0
 
-    # create the composite context outside the main loop, such that it canonizers and hooks do not need to be
-    # registered and removed for each step.
-    with composite.context(model) as modified:
+    # the accuracy
+    accuracy = 0.
+
+    # create the Gradient Attributor outside the data loader loop, such that its canonizers and hooks do not need to be
+    # registered and removed for each step. This registers the composite to the model within the with-statement
+    with Gradient(model, composite) as attributor:
         for data, target in loader:
             # we use data without the normalization applied for visualization, and with the normalization applied as
             # the model input
             data_norm = norm_fn(data.to(device))
-            data_norm.requires_grad_()
 
             # one-hot encoding of the target labels of size (len(target), 1000)
             output_relevance = eye[target]
 
-            out = modified(data_norm)
-            # a simple backward pass will accumulate the relevance in data_norm.grad
-            torch.autograd.backward((out,), (output_relevance,))
+            # this will compute the modified gradient of model, with the on
+            output, relevance = attributor(data_norm, output_relevance)
 
             # sum over the color channel for visualization
-            relevance = np.array(data_norm.grad.sum(1).detach().cpu())
+            relevance = np.array(relevance.sum(1).detach().cpu())
 
             # normalize symmetrically around 0
             amax = relevance.max((1, 2), keepdims=True)
             relevance = (relevance + amax) / 2 / amax
 
             for n in range(len(data)):
-                fname = relevance_format.format(sample=sample + n)
+                fname = relevance_format.format(sample=sample_index + n)
                 # zennit.image.imsave will create an appropriate heatmap given a cmap specification
                 imsave(fname, relevance[n], vmin=0., vmax=1., level=level, cmap=cmap)
                 if input_format is not None:
-                    fname = input_format.format(sample=sample + n)
+                    fname = input_format.format(sample=sample_index + n)
                     # if there are 3 color channels, imsave will not create a heatmap, but instead save the image with
                     # its appropriate colors
                     imsave(fname, data[n])
-            sample += len(data)
+            sample_index += len(data)
+
+            # update the accuracy
+            accuracy += (output.argmax(1) == target).sum().detach().cpu().item()
+
+    accuracy /= len(dataset)
+    print(f'Accuracy: {accuracy:.2f}')
 
 
 if __name__ == '__main__':
