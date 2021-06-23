@@ -7,7 +7,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor
 from torchvision.datasets import ImageFolder
 from torchvision.models import vgg16, vgg16_bn, resnet50
 
-from zennit.attribution import Gradient
+from zennit.attribution import Gradient, SmoothGrad
 from zennit.composites import COMPOSITES
 from zennit.image import imsave, CMAPS
 from zennit.torchvision import VGGCanonizer, ResNetCanonizer
@@ -17,6 +17,11 @@ MODELS = {
     'vgg16': (vgg16, VGGCanonizer),
     'vgg16_bn': (vgg16_bn, VGGCanonizer),
     'resnet50': (resnet50, ResNetCanonizer),
+}
+
+ATTRIBUTORS = {
+    'gradient': Gradient,
+    'smoothgrad': SmoothGrad,
 }
 
 
@@ -32,7 +37,8 @@ class BatchNormalize:
 @click.command()
 @click.argument('dataset-root', type=click.Path(file_okay=False))
 @click.argument('relevance_format', type=click.Path(dir_okay=False, writable=True))
-@click.option('--composite', 'composite_name', type=click.Choice(list(COMPOSITES)), default='epsilon_gamma_box')
+@click.option('--attributor', 'attributor_name', type=click.Choice(list(ATTRIBUTORS)), default='gradient')
+@click.option('--composite', 'composite_name', type=click.Choice(list(COMPOSITES)))
 @click.option('--model', 'model_name', type=click.Choice(list(MODELS)), default='vgg16_bn')
 @click.option('--parameters', type=click.Path(dir_okay=False))
 @click.option(
@@ -52,6 +58,7 @@ class BatchNormalize:
 def main(
     dataset_root,
     relevance_format,
+    attributor_name,
     composite_name,
     model_name,
     parameters,
@@ -113,20 +120,27 @@ def main(
     # convenience identity matrix to produce one-hot encodings
     eye = torch.eye(n_outputs, device=device)
 
-    composite_kwargs = {}
-    if composite_name == 'epsilon_gamma_box':
-        # the maximal input shape, needed for the ZBox rule
-        shape = (batch_size, 3, 224, 224)
+    # create a composite if composite_name was set, otherwise we do not use a composite
+    composite = None
+    if composite_name is not None:
+        composite_kwargs = {}
+        if composite_name == 'epsilon_gamma_box':
+            # the maximal input shape, needed for the ZBox rule
+            shape = (batch_size, 3, 224, 224)
 
-        # the highest and lowest pixel values for the ZBox rule
-        composite_kwargs['low'] = norm_fn(torch.zeros(*shape, device=device))
-        composite_kwargs['high'] = norm_fn(torch.ones(*shape, device=device))
+            # the highest and lowest pixel values for the ZBox rule
+            composite_kwargs['low'] = norm_fn(torch.zeros(*shape, device=device))
+            composite_kwargs['high'] = norm_fn(torch.ones(*shape, device=device))
 
-    # use torchvision specific canonizers, as supplied in the MODELS dict
-    composite_kwargs['canonizers'] = [MODELS[model_name][1]()]
+        # use torchvision specific canonizers, as supplied in the MODELS dict
+        composite_kwargs['canonizers'] = [MODELS[model_name][1]()]
 
-    # create a composite specified by a name; the COMPOSITES dict includes all preset composites provided by zennit.
-    composite = COMPOSITES[composite_name](**composite_kwargs)
+        # create a composite specified by a name; the COMPOSITES dict includes all preset composites provided by zennit.
+        composite = COMPOSITES[composite_name](**composite_kwargs)
+
+    # create an attributor, given the ATTRIBUTORS dict given above. If composite is None, the gradient will not be
+    # modified for the attribution
+    attributor = ATTRIBUTORS[attributor_name](model, composite)
 
     # the current sample index for creating file names
     sample_index = 0
@@ -134,9 +148,10 @@ def main(
     # the accuracy
     accuracy = 0.
 
-    # create the Gradient Attributor outside the data loader loop, such that its canonizers and hooks do not need to be
-    # registered and removed for each step. This registers the composite to the model within the with-statement
-    with Gradient(model, composite) as attributor:
+    # enter the attributor context outside the data loader loop, such that its canonizers and hooks do not need to be
+    # registered and removed for each step. This registers the composite (and applies the canonizer) to the model
+    # within the with-statement
+    with attributor:
         for data, target in loader:
             # we use data without the normalization applied for visualization, and with the normalization applied as
             # the model input
