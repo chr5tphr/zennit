@@ -34,11 +34,11 @@ def identity(obj):
 class Attributor(metaclass=ABCMeta):
     '''Base Attributor Class.
 
-    Attributors are convienience objects with an optional composite and when called, compute an attribution,
-    e.g., the gradient or anything that is the result of computing the gradient when using the provided composite.
-    Attributors also provide a context to be used in a `with` statement, similar to `CompositeContext`s. If the
-    forward function (or self.__call__) is called and the composite has not been registered (i.e. `composite.handles`
-    is empty), the composite will be temporarily registered to the model.
+    Attributors are convienience objects with an optional composite and when called, compute an attribution, e.g., the
+    gradient or anything that is the result of computing the gradient when using the provided composite.  Attributors
+    also provide a context to be used in a `with` statement, similar to `CompositeContext`s. If the forward function
+    (or `self.__call__`) is called and the composite has not been registered (i.e. `composite.handles` is empty), the
+    composite will be temporarily registered to the model.
 
     Parameters
     ----------
@@ -130,7 +130,7 @@ class Attributor(metaclass=ABCMeta):
     def forward(self, input, attr_output_fn):
         '''Abstract method. Compute the attribution of the model wrt. input, by using `attr_output_fn` as the function
         of the model output to provide the output attribution. This function will not register the composite, and is
-        wrapped in the __call__ of `Attributor`.
+        wrapped in the `__call__` of `Attributor`.
 
         Parameters
         ----------
@@ -148,7 +148,7 @@ class Gradient(Attributor):
     def forward(self, input, attr_output_fn):
         '''Compute the gradient of the model wrt. input, by using `attr_output_fn` as the function of the model output
         to provide the vector for the vector jacobian product.
-        This function will not register the composite, and is wrapped in the __call__ of `Attributor`.
+        This function will not register the composite, and is wrapped in the `__call__` of `Attributor`.
 
         Parameters
         ----------
@@ -206,7 +206,7 @@ class SmoothGrad(Attributor):
     def forward(self, input, attr_output_fn):
         '''Compute the SmoothGrad of the model wrt. input, by using `attr_output_fn` as the function of the model output
         to provide the vector for the vector jacobian product used to compute the gradient.
-        This function will not register the composite, and is wrapped in the __call__ of `Attributor`.
+        This function will not register the composite, and is wrapped in the `__call__` of `Attributor`.
 
         Parameters
         ----------
@@ -235,4 +235,76 @@ class SmoothGrad(Attributor):
             result += gradient / self.n_iter
 
         output = self.model(input)
+        return output, result
+
+
+class IntegratedGradients(Attributor):
+    '''This implements Integrated Gradients [1]. The result is the path integral of the gradients, estimated over
+    multiple discrete iterations. Supplying a composite will result instead in the path integral over the modified
+    gradient.
+
+    Parameters
+    ----------
+    model: obj:`torch.nn.Module`
+        The model for which the attribution will be computed. If `composite` is provided, this will also be the model
+        to which the composite will be registered within `with` statements, or when calling the `Attributor` instance.
+    composite: obj:`zennit.core.Composite`, optional
+        The optional composite to, if provided, be registered to the model within `with` statements or when calling the
+        `Attributor` instance.
+    attr_output: obj:`torch.Tensor` or callable, optional
+        The default output attribution to be used when calling the `Attributor` instance, which is either a Tensor
+        compatible with any input used, or a function of the model's output. If None (default), the value will be the
+        identity function.
+    baseline_fn: callable, optional
+        The baseline for which the model output is zero, supplied as a function of the input. Defaults to
+        `torch.zeros_like`.
+    n_iter: int, optional
+        The number of iterations used to estimate the integral, defaults to 20.
+
+    References
+    ----------
+    .. [1] M. Sundararajan, A. Taly, and Q. Yan, “Axiomatic attribution for deep networks,” in Proceedings of the 34th
+    International Conference on Machine Learning, ICML 2017, Sydney, NSW, Australia, 6-11 August 2017, ser. Proceedings
+    of Machine Learning Research, D. Precup and Y. W. Teh, Eds., vol. 70. PMLR, 2017, pp. 3319–3328.
+
+    '''
+    def __init__(self, model, composite=None, attr_output=None, baseline_fn=None, n_iter=20):
+        super().__init__(model=model, composite=composite, attr_output=attr_output)
+        if baseline_fn is None:
+            baseline_fn = torch.zeros_like
+        self.baseline_fn = baseline_fn
+        self.n_iter = n_iter
+
+    def forward(self, input, attr_output_fn):
+        '''Compute the Integrated Gradients of the model wrt. input, by using `attr_output_fn` as the function of the
+        model output to provide the vector for the vector jacobian product used to compute the gradient.
+        This function will not register the composite, and is wrapped in the `__call__` of `Attributor`.
+
+        Parameters
+        ----------
+        input: obj:`torch.Tensor`
+            Input for the model, and wrt. compute the attribution.
+        attr_output: obj:`torch.Tensor` or callable, optional
+            The output attribution function of the model's output.
+
+        Returns
+        -------
+        output: obj:`torch.Tensor`
+            Output of the model given `input`.
+        attribution: obj:`torch.Tensor`
+            Attribution of the model wrt. to `input`, with the same shape as `input`.
+        '''
+        input = input.detach()
+
+        baseline = self.baseline_fn(input)
+
+        result = torch.zeros_like(input)
+        for alpha in torch.linspace(1. / self.n_iter, 1., self.n_iter):
+            path_step = (baseline + alpha * (input - baseline)).requires_grad_()
+            output = self.model(path_step)
+            gradient, = torch.autograd.grad((output,), (path_step,), grad_outputs=(attr_output_fn(output.detach()),))
+            result += gradient / self.n_iter
+
+        result *= (input - baseline)
+        # in the last step, path_step is equal to input, thus `output` is the original output
         return output, result
