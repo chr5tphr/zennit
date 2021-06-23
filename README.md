@@ -84,12 +84,26 @@ $ .venv/bin/python feed_forward.py \
     --inputs 'results/vgg16_input_{sample:02d}.png' \
     --parameters params/vgg16-397923af.pth \
     --model vgg16 \
-    --composite epsilon_gamma_box
+    --composite epsilon_gamma_box \
+    --cmap coldnhot
 ```
 which computes the lrp heatmaps according to the `epsilon_gamma_box` rule and stores them in `results`, along with the respective input images.
 
 The resulting heatmaps may look like the following:
 ![beacon heatmaps](https://raw.githubusercontent.com/chr5tphr/zennit/master/share/img/beacon_vgg16_epsilon_gamma_box.png)
+
+Alternatively, heatmaps with absolute relevances for SmoothGrad may be computed by omitting `--composite` and supplying `--attributor`:
+```shell
+$ .venv/bin/python feed_forward.py \
+    data/lighthouses \
+    'results/vgg16_smoothgrad_{sample:02d}.png' \
+    --inputs 'results/vgg16_input_{sample:02d}.png' \
+    --parameters params/vgg16-397923af.pth \
+    --model vgg16 \
+    --attributor smoothgrad \
+    --absolute-relevance \
+    --cmap hot
+```
 
 The following is a slightly modified exerpt of `share/example/feed_forward.py`:
 ```python
