@@ -7,7 +7,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor
 from torchvision.datasets import ImageFolder
 from torchvision.models import vgg16, vgg16_bn, resnet50
 
-from zennit.attribution import Gradient, SmoothGrad
+from zennit.attribution import Gradient, SmoothGrad, IntegratedGradients
 from zennit.composites import COMPOSITES
 from zennit.image import imsave, CMAPS
 from zennit.torchvision import VGGCanonizer, ResNetCanonizer
@@ -22,6 +22,7 @@ MODELS = {
 ATTRIBUTORS = {
     'gradient': Gradient,
     'smoothgrad': SmoothGrad,
+    'integrads': IntegratedGradients,
 }
 
 
@@ -52,6 +53,7 @@ class BatchNormalize:
 @click.option('--n-outputs', type=int, default=1000)
 @click.option('--cpu/--gpu', default=True)
 @click.option('--shuffle/--no-shuffle', default=False)
+@click.option('--absolute-relevance/--no-absolute-relevance', default=False)
 @click.option('--cmap', type=click.Choice(list(CMAPS)), default='coldnhot')
 @click.option('--level', type=float, default=1.0)
 @click.option('--seed', type=int, default=0xDEADBEEF)
@@ -70,6 +72,7 @@ def main(
     shuffle,
     cmap,
     level,
+    absolute_relevance,
     seed
 ):
     '''Generate heatmaps of an image folder at DATASET_ROOT to files RELEVANCE_FORMAT.
@@ -166,9 +169,14 @@ def main(
             # sum over the color channel for visualization
             relevance = np.array(relevance.sum(1).detach().cpu())
 
-            # normalize symmetrically around 0
-            amax = relevance.max((1, 2), keepdims=True)
-            relevance = (relevance + amax) / 2 / amax
+            if absolute_relevance:
+                # use the absolute relevance, normalized between 0. and 1.
+                relevance = np.abs(relevance)
+                relevance /= relevance.max((1, 2), keepdims=True)
+            else:
+                # normalize symmetrically around 0, then normalize between 0. and 1.
+                amax = relevance.max((1, 2), keepdims=True)
+                relevance = (relevance + amax) / 2 / amax
 
             for n in range(len(data)):
                 fname = relevance_format.format(sample=sample_index + n)
