@@ -17,6 +17,8 @@
 # along with this library. If not, see <https://www.gnu.org/licenses/>.
 '''Attributors are convienence objects to compute an attributions, optionally using composites.'''
 from abc import ABCMeta, abstractmethod
+from functools import partial
+from itertools import product
 
 import torch
 
@@ -29,6 +31,12 @@ def constant(obj):
 
 def identity(obj):
     return obj
+
+
+def occlude_independent(input, mask, fill_fn=torch.zeros_like, invert=False):
+    if invert:
+        mask = ~mask
+    return input * mask + ~mask * fill_fn(input)
 
 
 class Attributor(metaclass=ABCMeta):
@@ -307,4 +315,106 @@ class IntegratedGradients(Attributor):
 
         result *= (input - baseline)
         # in the last step, path_step is equal to input, thus `output` is the original output
+        return output, result
+
+
+class Occlusion(Attributor):
+    '''This implements attribution by occlusion. Supplying a composite will have no effect on the result, as the
+    gradient is not used.
+
+    Parameters
+    ----------
+    model: obj:`torch.nn.Module`
+        The model for which the attribution will be computed. If `composite` is provided, this will also be the model
+        to which the composite will be registered within `with` statements, or when calling the `Attributor` instance.
+    composite: obj:`zennit.core.Composite`, optional
+        The optional composite to, if provided, be registered to the model within `with` statements or when calling the
+        `Attributor` instance. Note that for Occlusion, this has no effect on the result.
+    attr_output: obj:`torch.Tensor` or callable, optional
+        The default output attribution to be used when calling the `Attributor` instance, which is either a Tensor
+        compatible with any input used, or a function of the model's output. If None (default), the value will be the
+        identity function.
+    occlusion_fn: callable, optional
+        The occluded function, called with `occlusion_fn(input, mask)`, where `mask` is 1 inside the sliding window,
+        and 0 outside. Either values inside or outside the sliding window may be occluded for different effects. By
+        default, all values except inside the sliding window will be occluded.
+    window: int or tuple of ints, optional
+        The size of the sliding window to occlude over the input for each dimension. Defaults to 8. If a single integer
+        is provided, the sliding window will slide over all dimensions with the same size. If a tuple is provided, the
+        window will only slide over the n-last dimensions, where n is the length of the tuple, e.g., if the data has
+        shape `(3, 32, 32)` and `window=(8, 8)`, the resulting mask will have a block of shape `(3, 8, 8)` set to True.
+        `window` must have the same length as `stride`.
+    stride: int or tuple of ints, optional
+        The strides used for the sliding window to occlude over the input for each dimension. Defaults to 8. If a
+        single integer is provided, the strides will be the same size for all dimensions. If a tuple is provided,
+        the window will only stride over the n-last dimensions, where n is the length of the tuple.
+        `stride` must have the same length as `window`.
+
+    '''
+    def __init__(self, model, composite=None, attr_output=None, occlusion_fn=None, window=8, stride=8):
+        def typecheck(obj):
+            return isinstance(window, int) or isinstance(window, tuple) and all(isinstance(elem, int) for elem in obj)
+
+        super().__init__(model=model, composite=composite, attr_output=attr_output)
+
+        if not typecheck(window):
+            raise TypeError('Occlusion window must either be an int, or a tuple of ints.')
+        if not typecheck(stride):
+            raise TypeError('Occlusion window must either be an int, or a tuple of ints.')
+
+        if occlusion_fn is None:
+            occlusion_fn = partial(occlude_independent, fill_fn=torch.zeros_like, invert=False)
+        self.occlusion_fn = occlusion_fn
+        self.window = window
+        self.stride = stride
+
+    def _resolve_window_stride(self, input):
+        window = self.window
+        stride = self.stride
+        if isinstance(window, int):
+            window = tuple(min(window, size) for size in input.shape)
+        if isinstance(stride, int):
+            window = tuple(min(stride, size) for size in input.shape)
+
+        if len(window) < input.ndim:
+            window = tuple(input.shape)[:input.ndim - len(window)] + window
+        if len(stride) < len(window):
+            stride = window[:len(window) - len(stride)] + stride
+
+        return window, stride
+
+    def forward(self, input, attr_output_fn):
+        '''Compute the occlusion analysis of the model wrt. input, by using `attr_output_fn` as function of the output,
+        to return a weighting, which when multiplied again with the output, results in the classification score.
+        This function will not register the composite, and is wrapped in the `__call__` of `Attributor`.
+
+        Parameters
+        ----------
+        input: obj:`torch.Tensor`
+            Input for the model, and wrt. compute the attribution.
+        attr_output: obj:`torch.Tensor` or callable, optional
+            The output attribution function of the model's output.
+
+        Returns
+        -------
+        output: obj:`torch.Tensor`
+            Output of the model given `input`.
+        attribution: obj:`torch.Tensor`
+            Attribution of the model wrt. to `input`, with the same shape as `input`.
+        '''
+        window, stride = self._resolve_window_stride(input)
+
+        root_mask = torch.zeros(input.shape, dtype=bool)
+        root_mask[tuple(slice(0, elem) for elem in window)] = True
+
+        result = torch.zeros_like(input)
+        for offset in product(*(range(0, size, local_stride) for size, local_stride in zip(input.shape, stride))):
+            mask = root_mask.roll(offset, tuple(range(input.ndim)))
+            occluded_input = self.occlusion_fn(input, mask)
+            with torch.no_grad():
+                output = self.model(occluded_input)
+            score = (attr_output_fn(output) * output).sum(tuple(range(1, output.ndim)))
+            result += mask * score[(slice(None),) + (None,) * (input.ndim - 1)]
+
+        output = self.model(input)
         return output, result
