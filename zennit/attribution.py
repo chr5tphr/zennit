@@ -164,7 +164,75 @@ class Gradient(Attributor):
         attribution: obj:`torch.Tensor`
             Attribution of the model wrt. to `input`, with the same shape as `input`.
         '''
-        input = input.clone().requires_grad_(True)
+        input = input.detach().requires_grad_(True)
         output = self.model(input)
         gradient, = torch.autograd.grad((output,), (input,), grad_outputs=(attr_output_fn(output.detach()),))
         return output, gradient
+
+
+class SmoothGrad(Attributor):
+    '''This implements SmoothGrad [1]. The result is the average over the gradient of multiple iterations where some
+    normal distributed noise was added to the input. Supplying a composite will result instead in averaging over the
+    modified gradient.
+
+    Parameters
+    ----------
+    model: obj:`torch.nn.Module`
+        The model for which the attribution will be computed. If `composite` is provided, this will also be the model
+        to which the composite will be registered within `with` statements, or when calling the `Attributor` instance.
+    composite: obj:`zennit.core.Composite`, optional
+        The optional composite to, if provided, be registered to the model within `with` statements or when calling the
+        `Attributor` instance.
+    attr_output: obj:`torch.Tensor` or callable, optional
+        The default output attribution to be used when calling the `Attributor` instance, which is either a Tensor
+        compatible with any input used, or a function of the model's output. If None (default), the value will be the
+        identity function.
+    noise_level: float, optional
+        The noise level, which is $\\sigma / (x_{max} - x_{min})$ and defaults to 0.1.
+    n_iter: int, optional
+        The number of iterations over which to average, defaults to 20.
+
+    References
+    ----------
+    .. [1] D. Smilkov, N. Thorat, B. Kim, F. B. Viégas, and M. Wattenberg: "SmoothGrad: removing noise by adding
+    noise," CoRR, vol. abs/1706.03825, 2017.
+
+    '''
+    def __init__(self, model, composite=None, attr_output=None, noise_level=0.1, n_iter=20):
+        super().__init__(model=model, composite=composite, attr_output=attr_output)
+        self.noise_level = noise_level
+        self.n_iter = n_iter
+
+    def forward(self, input, attr_output_fn):
+        '''Compute the SmoothGrad of the model wrt. input, by using `attr_output_fn` as the function of the model output
+        to provide the vector for the vector jacobian product used to compute the gradient.
+        This function will not register the composite, and is wrapped in the __call__ of `Attributor`.
+
+        Parameters
+        ----------
+        input: obj:`torch.Tensor`
+            Input for the model, and wrt. compute the attribution.
+        attr_output: obj:`torch.Tensor` or callable, optional
+            The output attribution function of the model's output.
+
+        Returns
+        -------
+        output: obj:`torch.Tensor`
+            Output of the model given `input`.
+        attribution: obj:`torch.Tensor`
+            Attribution of the model wrt. to `input`, with the same shape as `input`.
+        '''
+        input = input.detach()
+
+        dims = tuple(range(1, input.ndim))
+        std = self.noise_level * (input.amax(dims, keepdim=True) - input.amin(dims, keepdim=True))
+
+        result = torch.zeros_like(input)
+        for _ in range(self.n_iter):
+            noisy_input = (input + torch.randn_like(input) * std).requires_grad_()
+            output = self.model(noisy_input)
+            gradient, = torch.autograd.grad((output,), (noisy_input,), grad_outputs=(attr_output_fn(output.detach()),))
+            result += gradient / self.n_iter
+
+        output = self.model(input)
+        return output, result
