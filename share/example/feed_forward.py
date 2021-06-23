@@ -7,7 +7,7 @@ from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor
 from torchvision.datasets import ImageFolder
 from torchvision.models import vgg16, vgg16_bn, resnet50
 
-from zennit.attribution import Gradient, SmoothGrad, IntegratedGradients
+from zennit.attribution import Gradient, SmoothGrad, IntegratedGradients, Occlusion
 from zennit.composites import COMPOSITES
 from zennit.image import imsave, CMAPS
 from zennit.torchvision import VGGCanonizer, ResNetCanonizer
@@ -23,6 +23,7 @@ ATTRIBUTORS = {
     'gradient': Gradient,
     'smoothgrad': SmoothGrad,
     'integrads': IntegratedGradients,
+    'occlusion': Occlusion,
 }
 
 
@@ -53,7 +54,7 @@ class BatchNormalize:
 @click.option('--n-outputs', type=int, default=1000)
 @click.option('--cpu/--gpu', default=True)
 @click.option('--shuffle/--no-shuffle', default=False)
-@click.option('--absolute-relevance/--no-absolute-relevance', default=False)
+@click.option('--relevance-norm', type=click.Choice(['symmetric', 'absolute', 'unaligned']), default='symmetric')
 @click.option('--cmap', type=click.Choice(list(CMAPS)), default='coldnhot')
 @click.option('--level', type=float, default=1.0)
 @click.option('--seed', type=int, default=0xDEADBEEF)
@@ -72,7 +73,7 @@ def main(
     shuffle,
     cmap,
     level,
-    absolute_relevance,
+    relevance_norm,
     seed
 ):
     '''Generate heatmaps of an image folder at DATASET_ROOT to files RELEVANCE_FORMAT.
@@ -141,9 +142,16 @@ def main(
         # create a composite specified by a name; the COMPOSITES dict includes all preset composites provided by zennit.
         composite = COMPOSITES[composite_name](**composite_kwargs)
 
+    # specify some attributor-specific arguments
+    attributor_kwargs = {
+        'smoothgrad': {'noise_level': 0.1, 'n_iter': 20},
+        'integrads': {'n_iter': 20},
+        'occlusion': {'window': (56, 56), 'stride': (28, 28)},
+    }.get(attributor_name, {})
+
     # create an attributor, given the ATTRIBUTORS dict given above. If composite is None, the gradient will not be
     # modified for the attribution
-    attributor = ATTRIBUTORS[attributor_name](model, composite)
+    attributor = ATTRIBUTORS[attributor_name](model, composite, **attributor_kwargs)
 
     # the current sample index for creating file names
     sample_index = 0
@@ -169,14 +177,20 @@ def main(
             # sum over the color channel for visualization
             relevance = np.array(relevance.sum(1).detach().cpu())
 
-            if absolute_relevance:
-                # use the absolute relevance, normalized between 0. and 1.
+            # normalize between 0. and 1. given the specified strategy
+            if relevance_norm == 'symmetric':
+                # 0-aligned symmetric relevance, negative and positive can be compared, the original 0. becomes 0.5
+                amax = np.abs(relevance).max((1, 2), keepdims=True)
+                relevance = (relevance + amax) / 2 / amax
+            elif relevance_norm == 'absolute':
+                # 0-aligned absolute relevance, only the amplitude of relevance matters, the original 0. becomes 0.
                 relevance = np.abs(relevance)
                 relevance /= relevance.max((1, 2), keepdims=True)
-            else:
-                # normalize symmetrically around 0, then normalize between 0. and 1.
-                amax = relevance.max((1, 2), keepdims=True)
-                relevance = (relevance + amax) / 2 / amax
+            elif relevance_norm == 'unaligned':
+                # do not align, the orignal minimum value becomes 0., the orignal maximum becomes 1.
+                rmin = relevance.min((1, 2), keepdims=True)
+                rmax = relevance.max((1, 2), keepdims=True)
+                relevance = (relevance - rmin) / (rmax - rmin)
 
             for n in range(len(data)):
                 fname = relevance_format.format(sample=sample_index + n)
