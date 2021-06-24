@@ -89,6 +89,7 @@ $ .venv/bin/python feed_forward.py \
     --cmap coldnhot
 ```
 which computes the lrp heatmaps according to the `epsilon_gamma_box` rule and stores them in `results`, along with the respective input images.
+Other possible composites that can be passed to `--composites` are, e.g., `epsilon_plus`, `epsilon_alpha2_beta1_flat`, `guided_backprop`, `excitation_backprop`.
 
 The resulting heatmaps may look like the following:
 ![beacon heatmaps](https://raw.githubusercontent.com/chr5tphr/zennit/master/share/img/beacon_vgg16_epsilon_gamma_box.png)
