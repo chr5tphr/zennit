@@ -20,7 +20,7 @@ import torch
 
 from .core import Composite
 from .layer import Sum
-from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm
+from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm, ReLUDeconvNet, ReLUGuidedBackprop
 from .types import Convolution, Linear, AvgPool, Activation
 
 
@@ -230,3 +230,54 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
             (Linear, Flat())
         ]
         super().__init__(layer_map, first_map, canonizers=canonizers)
+
+
+@register_composite('deconvnet')
+class DeconvNet(LayerMapComposite):
+    '''An explicit composite modifying the gradients of all ReLUs according to DeconvNet [1].
+
+    References
+    ----------
+    .. [1] M. D. Zeiler and R. Fergus, “Visualizing and understanding convolutional networks,” in European conference
+    on computer vision. Springer, 2014, pp. 818–833.
+    '''
+    def __init__(self, canonizers=None):
+        layer_map = [
+            (torch.nn.ReLU, ReLUDeconvNet()),
+        ]
+        super().__init__(layer_map, canonizers=canonizers)
+
+
+@register_composite('guided_backprop')
+class GuidedBackprop(LayerMapComposite):
+    '''An explicit composite modifying the gradients of all ReLUs according to GuidedBackprop [1].
+
+    References
+    ----------
+    .. [1] J. T. Springenberg, A. Dosovitskiy, T. Brox, and M. A. Riedmiller, “Striving for simplicity: The all
+    convolutional net,” in Proceedings of the International Conference of Learning Representations (ICLR), 2015.
+    '''
+    def __init__(self, canonizers=None):
+        layer_map = [
+            (torch.nn.ReLU, ReLUGuidedBackprop()),
+        ]
+        super().__init__(layer_map, canonizers=canonizers)
+
+
+@register_composite('excitation_backprop')
+class ExcitationBackprop(LayerMapComposite):
+    '''An explicit composite implementing the ExcitationBackprop [1].
+
+    References
+    ----------
+    .. [1] J. Zhang, S. A. Bargal, Z. Lin, J. Brandt, X. Shen, and S. Sclaroff, “Top-down neural attention by
+    excitation backprop,” International Journal of Computer Vision, vol. 126, no. 10, pp. 1084–1102, 2018.
+
+    '''
+    def __init__(self, canonizers=None):
+        layer_map = [
+            (Sum, Norm()),
+            (AvgPool, Norm()),
+            (Linear, ZPlus()),
+        ]
+        super().__init__(layer_map, canonizers=canonizers)
