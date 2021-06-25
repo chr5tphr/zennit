@@ -119,15 +119,11 @@ class Identity(torch.autograd.Function):
     @staticmethod
     def forward(ctx, *inputs):
         '''Forward identity.'''
-        if len(inputs) == 1:
-            return inputs[0]
         return inputs
 
     @staticmethod
     def backward(ctx, *grad_outputs):
         '''Backward identity.'''
-        if len(grad_outputs) == 1:
-            return grad_outputs[0]
         return grad_outputs
 
 
@@ -144,11 +140,28 @@ class Hook:
         def wrapper(grad_input, grad_output):
             return hook_ref().backward(module, grad_input, hook_ref().stored_tensors['grad_output'])
 
-        output = Identity.apply(input[0])
-        output.grad_fn.register_hook(wrapper)
+        if not isinstance(input, tuple):
+            input = (input,)
+
+        post_input = Identity.apply(*input)
+        post_input[0].grad_fn.register_hook(wrapper)
         # work around to support in-place operations
-        output = output.clone()
-        return (output,)
+        post_input = tuple(elem.clone() for elem in post_input)
+        return post_input[0] if len(post_input) == 1 else post_input
+
+    def post_forward(self, module, input, output):
+        '''Register a backward-hook to the resulting tensor right after the forward.'''
+        hook_ref = weakref.ref(self)
+
+        @functools.wraps(self.pre_backward)
+        def wrapper(grad_input, grad_output):
+            return hook_ref().pre_backward(module, grad_input, grad_output)
+
+        if not isinstance(output, tuple):
+            output = (output,)
+
+        output[0].grad_fn.register_hook(wrapper)
+        return output[0] if len(output) == 1 else output
 
     def pre_backward(self, module, grad_input, grad_output):
         '''Store the grad_output for the backward hook'''
@@ -175,8 +188,8 @@ class Hook:
         return RemovableHandleList([
             RemovableHandle(self),
             module.register_forward_pre_hook(self.pre_forward),
+            module.register_forward_hook(self.post_forward),
             module.register_forward_hook(self.forward),
-            module.register_backward_hook(self.pre_backward),
         ])
 
 
