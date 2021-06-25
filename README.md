@@ -127,7 +127,7 @@ Heatmaps for Occlusion Analysis with unaligned relevances may be computed by exe
 ```shell
 $ .venv/bin/python feed_forward.py \
     data/lighthouses \
-    'results/vgg16_smoothgrad_{sample:02d}.png' \
+    'results/vgg16_occlusion_{sample:02d}.png' \
     --inputs 'results/vgg16_input_{sample:02d}.png' \
     --parameters params/vgg16-397923af.pth \
     --model vgg16 \
