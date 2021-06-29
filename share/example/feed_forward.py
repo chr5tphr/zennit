@@ -1,4 +1,6 @@
 '''A quick example to generate heatmaps for vgg16.'''
+import os
+
 import click
 import torch
 import numpy as np
@@ -34,6 +36,21 @@ class BatchNormalize:
 
     def __call__(self, tensor):
         return (tensor - self.mean) / self.std
+
+
+class AllowEmptyClassImageFolder(ImageFolder):
+    '''Subclass of ImageFolder, which only finds non-empty classes, but with their correct indices given other empty
+    classes. This counter-acts the changes in torchvision 0.10.0, in which DatasetFolder does not allow empty classes
+    anymore by default. Versions before 0.10.0 do not expose `find_classes`, and thus this change does not change the
+    functionality of `ImageFolder` in earlier versions.
+    '''
+    def find_classes(self, directory):
+        with os.scandir(directory) as scanit:
+            class_info = sorted((entry.name, entry.stat().st_size) for entry in scanit if entry.is_dir())
+        class_to_idx = {class_name: index for index, (class_name, st_size) in enumerate(class_info) if st_size}
+        if not class_to_idx:
+            raise FileNotFoundError(f'No non-empty classes found in \'{directory}\'.')
+        return list(class_to_idx), class_to_idx
 
 
 @click.command()
@@ -96,7 +113,7 @@ def main(
     ])
 
     # the dataset is a folder containing folders with samples, where each folder corresponds to one label
-    dataset = ImageFolder(dataset_root, transform=transform)
+    dataset = AllowEmptyClassImageFolder(dataset_root, transform=transform)
 
     # limit the number of output samples, if requested, by creating a subset
     if max_samples is not None:
