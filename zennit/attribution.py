@@ -236,13 +236,19 @@ class SmoothGrad(Attributor):
         std = self.noise_level * (input.amax(dims, keepdim=True) - input.amin(dims, keepdim=True))
 
         result = torch.zeros_like(input)
-        for _ in range(self.n_iter):
-            noisy_input = (input + torch.randn_like(input) * std).requires_grad_()
+        for n in range(self.n_iter):
+            # the last epsilon is defined as zero to compute the true output,
+            # and have SmoothGrad w/ n_iter = 1 === gradient
+            if n == self.n_iter - 1:
+                epsilon = torch.zeros_like(input)
+            else:
+                epsilon = torch.randn_like(input) * std
+            noisy_input = (input + epsilon).requires_grad_()
             output = self.model(noisy_input)
             gradient, = torch.autograd.grad((output,), (noisy_input,), grad_outputs=(attr_output_fn(output.detach()),))
             result += gradient / self.n_iter
 
-        output = self.model(input)
+        # output is leaking from the loop for the last epsilon (which is zero)
         return output, result
 
 
