@@ -143,7 +143,7 @@ class Hook:
         if not isinstance(input, tuple):
             input = (input,)
 
-        if input[0].grad_fn is not None:
+        if input[0].requires_grad:
             # only if gradient required
             post_input = Identity.apply(*input)
             post_input[0].grad_fn.register_hook(wrapper)
