@@ -179,7 +179,7 @@ class Gradient(Attributor):
 
 
 class SmoothGrad(Attributor):
-    '''This implements SmoothGrad [1]. The result is the average over the gradient of multiple iterations where some
+    '''This implements SmoothGrad [1]_. The result is the average over the gradient of multiple iterations where some
     normal distributed noise was added to the input. Supplying a composite will result instead in averaging over the
     modified gradient.
 
@@ -196,14 +196,14 @@ class SmoothGrad(Attributor):
         compatible with any input used, or a function of the model's output. If None (default), the value will be the
         identity function.
     noise_level: float, optional
-        The noise level, which is $\\sigma / (x_{max} - x_{min})$ and defaults to 0.1.
+        The noise level, which is :math:`\\frac{\\sigma}{x_{max} - x_{min}}` and defaults to 0.1.
     n_iter: int, optional
         The number of iterations over which to average, defaults to 20.
 
     References
     ----------
     .. [1] D. Smilkov, N. Thorat, B. Kim, F. B. Viégas, and M. Wattenberg: "SmoothGrad: removing noise by adding
-    noise," CoRR, vol. abs/1706.03825, 2017.
+           noise," CoRR, vol. abs/1706.03825, 2017.
 
     '''
     def __init__(self, model, composite=None, attr_output=None, noise_level=0.1, n_iter=20):
@@ -253,7 +253,7 @@ class SmoothGrad(Attributor):
 
 
 class IntegratedGradients(Attributor):
-    '''This implements Integrated Gradients [1]. The result is the path integral of the gradients, estimated over
+    '''This implements Integrated Gradients [2]_. The result is the path integral of the gradients, estimated over
     multiple discrete iterations. Supplying a composite will result instead in the path integral over the modified
     gradient.
 
@@ -277,9 +277,9 @@ class IntegratedGradients(Attributor):
 
     References
     ----------
-    .. [1] M. Sundararajan, A. Taly, and Q. Yan, “Axiomatic attribution for deep networks,” in Proceedings of the 34th
-    International Conference on Machine Learning, ICML 2017, Sydney, NSW, Australia, 6-11 August 2017, ser. Proceedings
-    of Machine Learning Research, D. Precup and Y. W. Teh, Eds., vol. 70. PMLR, 2017, pp. 3319–3328.
+    .. [2] M. Sundararajan, A. Taly, and Q. Yan, “Axiomatic attribution for deep networks,” in Proceedings of the 34th
+       International Conference on Machine Learning, ICML 2017, Sydney, NSW, Australia, 6-11 August 2017, ser. Proceedings
+       of Machine Learning Research, D. Precup and Y. W. Teh, Eds., vol. 70. PMLR, 2017, pp. 3319–3328.
 
     '''
     def __init__(self, model, composite=None, attr_output=None, baseline_fn=None, n_iter=20):
