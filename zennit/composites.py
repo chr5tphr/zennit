@@ -1,9 +1,26 @@
+# This file is part of Zennit
+# Copyright (C) 2019-2021 Christopher J. Anders
+#
+# zennit/composites.py
+#
+# Zennit is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation; either version 3 of the License, or (at your option) any
+# later version.
+#
+# Zennit is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for
+# more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this library. If not, see <https://www.gnu.org/licenses/>.
 '''Composites, registered in a global composite dict.'''
 import torch
 
 from .core import Composite
 from .layer import Sum
-from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm
+from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm, ReLUDeconvNet, ReLUGuidedBackprop
 from .types import Convolution, Linear, AvgPool, Activation
 
 
@@ -213,3 +230,54 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
             (Linear, Flat())
         ]
         super().__init__(layer_map, first_map, canonizers=canonizers)
+
+
+@register_composite('deconvnet')
+class DeconvNet(LayerMapComposite):
+    '''An explicit composite modifying the gradients of all ReLUs according to DeconvNet [1].
+
+    References
+    ----------
+    .. [1] M. D. Zeiler and R. Fergus, “Visualizing and understanding convolutional networks,” in European conference
+    on computer vision. Springer, 2014, pp. 818–833.
+    '''
+    def __init__(self, canonizers=None):
+        layer_map = [
+            (torch.nn.ReLU, ReLUDeconvNet()),
+        ]
+        super().__init__(layer_map, canonizers=canonizers)
+
+
+@register_composite('guided_backprop')
+class GuidedBackprop(LayerMapComposite):
+    '''An explicit composite modifying the gradients of all ReLUs according to GuidedBackprop [1].
+
+    References
+    ----------
+    .. [1] J. T. Springenberg, A. Dosovitskiy, T. Brox, and M. A. Riedmiller, “Striving for simplicity: The all
+    convolutional net,” in Proceedings of the International Conference of Learning Representations (ICLR), 2015.
+    '''
+    def __init__(self, canonizers=None):
+        layer_map = [
+            (torch.nn.ReLU, ReLUGuidedBackprop()),
+        ]
+        super().__init__(layer_map, canonizers=canonizers)
+
+
+@register_composite('excitation_backprop')
+class ExcitationBackprop(LayerMapComposite):
+    '''An explicit composite implementing the ExcitationBackprop [1].
+
+    References
+    ----------
+    .. [1] J. Zhang, S. A. Bargal, Z. Lin, J. Brandt, X. Shen, and S. Sclaroff, “Top-down neural attention by
+    excitation backprop,” International Journal of Computer Vision, vol. 126, no. 10, pp. 1084–1102, 2018.
+
+    '''
+    def __init__(self, canonizers=None):
+        layer_map = [
+            (Sum, Norm()),
+            (AvgPool, Norm()),
+            (Linear, ZPlus()),
+        ]
+        super().__init__(layer_map, canonizers=canonizers)

@@ -1,3 +1,20 @@
+# This file is part of Zennit
+# Copyright (C) 2019-2021 Christopher J. Anders
+#
+# zennit/rules.py
+#
+# Zennit is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation; either version 3 of the License, or (at your option) any
+# later version.
+#
+# Zennit is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for
+# more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this library. If not, see <https://www.gnu.org/licenses/>.
 '''Rules based on Hooks'''
 import torch
 
@@ -186,3 +203,15 @@ class Flat(BasicHook):
             reducer=(lambda inputs, gradients: gradients[0]),
             require_params=False
         )
+
+
+class ReLUDeconvNet(Hook):
+    def backward(self, module, grad_input, grad_output):
+        '''Modify ReLU gradient according to DeconvNet.'''
+        return (grad_output[0].clamp(min=0),)
+
+
+class ReLUGuidedBackprop(Hook):
+    def backward(self, module, grad_input, grad_output):
+        '''Modify ReLU gradient according to GuidedBackprop.'''
+        return (grad_input[0] * (grad_output[0] > 0.),)

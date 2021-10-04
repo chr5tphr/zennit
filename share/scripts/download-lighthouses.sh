@@ -94,6 +94,18 @@ wnids=(
     n12768682 n12985857 n12998815 n13037406 n13040303 n13044778 n13052670 n13054560 n13133613 n15075141
 )
 
+wnid="n02814860"
+
+URLS=(
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/2006_09_06_180_Leuchtturm.jpg/640px-2006_09_06_180_Leuchtturm.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/2014_Leuchtturm_Kap_Arkona_02.jpg/320px-2014_Leuchtturm_Kap_Arkona_02.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/2013-12-06_Orkan_Xaver_in_Warnem%C3%BCnde_12.jpg/640px-2013-12-06_Orkan_Xaver_in_Warnem%C3%BCnde_12.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Leuchtturm_Dornbusch_2012.JPG/321px-Leuchtturm_Dornbusch_2012.JPG'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Neuer_Leuchtturm_Arkona_2012.jpg/640px-Neuer_Leuchtturm_Arkona_2012.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Pilsumer_Leuchtturm_2010-10_CN-I.jpg/640px-Pilsumer_Leuchtturm_2010-10_CN-I.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Lindau_Harbor_Lake_Constance_01.jpg/640px-Lindau_Harbor_Lake_Constance_01.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Heligoland_07-2016_photo28.jpg/640px-Heligoland_07-2016_photo28.jpg'
+)
 
 process_file() {
     mime="$(file --brief --mime-type "${1}")"
@@ -116,18 +128,16 @@ die() {
 
 usage() {
   cat <<EOF
-Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-o output] [-n n_total] [-w wnid]
+Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-o output] [-w wnid]
 
 Create a ILSVRC2012 image folder with 1000 classes that can be used with PyTorch to 'output'.
-Randomly download 'n_total' images from URLs supplied by http://image-net.org of label 'wnid'.
+Download 8 images of light houses from https://commons.wikimedia.org and put them into folder 'n02814860'.
 
 Requires (magic-) file and cURL.
 
 Available options:
 
 -o, --output    Path to store dataset (default = 'share/datasets/subimagenet')
--n, --n-total   Number of images to download (default = 8)
--w, --wnid      WordNetID label of images to download (default = 'n02814860')
 -h, --help      Print this help and exit
 -v, --verbose   Print script debug info
 EOF
@@ -136,22 +146,12 @@ EOF
 
 
 parse_params() {
-    output="share/datasets/subimagenet"
-    wnid="n02814860"
-    n_total=8
+    output="share/datasets/lighthouses"
 
     while :; do
         case "${1-}" in
             -h | --help) usage ;;
             -v | --verbose) set -x ;;
-            -n | --n-total)
-                n_total="${2-}"
-                shift
-                ;;
-            -w | --wnid)
-                wnid="${2-}"
-                shift
-                ;;
             -o | --output)
                 output="${2-}"
                 shift
@@ -163,8 +163,6 @@ parse_params() {
     done
 
     [[ -z "${output}" ]] && die "Empty parameter: output"
-    [[ -z "${wnid}" ]] && die "Empty parameter: wnid"
-    [[ -z "${n_total}" ]] && die "Empty parameter: n-total"
     [[ ${#args[@]} -ne 0 ]] && die "Too many positional arguments"
 
     return 0
@@ -177,26 +175,10 @@ command -v curl >/dev/null || die "curl not available!" 1
 command -v file >/dev/null || die "file not available!" 1
 
 mkdir -p "${wnids[@]/#/"$output/"}"
-echo -ne "Fetching URLs for \x1b[1m${wnid}\x1b[0m..."
-fetchtmp="${output}/${wnid}/urls.temp"
-if ! curl \
-        'http://www.image-net.org/api/text/imagenet.synset.geturls' \
-        --silent \
-        --get \
-        --data-urlencode "wnid=${wnid}" \
-        --output "${fetchtmp}"; then
-    echo
-    rm -f "$fetchtmp"
-    die "Failed to fetch URLs!" 1
-fi
-echo -e "received \x1b[1m$(wc -l "$fetchtmp" | cut -d' ' -f1)\x1b[0m URLs"
-
-mapfile -t urls < <( shuf "$fetchtmp" | tr -d '\r' )
-rm -f "$fetchtmp"
 
 echo -n "Downloading: "
 n_loaded=0
-for url in "${urls[@]}"; do
+for url in "${URLS[@]}"; do
     fname="${output}/${wnid}/image.temp"
     curl "${url}" --silent --location --connect-timeout 3 --max-time 10 --output "${fname}"
     if process_file "$fname"; then
@@ -204,10 +186,6 @@ for url in "${urls[@]}"; do
         echo -ne "\x1b[32m+\x1b[0m"
     else
         echo -ne "\x1b[31m.\x1b[0m"
-    fi
-
-    if (( n_loaded >= n_total )); then
-        break;
     fi
 done
 
