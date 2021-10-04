@@ -42,7 +42,7 @@ def stabilize(input, epsilon=1e-6):
 
 
 @contextmanager
-def mod_params(module, modifier, param_keys=None, require_params=True):
+def mod_params(module, weight_modifier, bias_modifier, param_keys=None, require_params=True):
     '''Context manager to temporarily modify parameter attributes (all by default) of a module.
 
     Parameters
@@ -50,8 +50,10 @@ def mod_params(module, modifier, param_keys=None, require_params=True):
     module: obj:`torch.nn.Module`
         Module of which to modify parameters. If `requires_params` is `True`, it must have all elements given in
         `param_keys` as attributes (attributes are allowed to be `None`, in which case they are ignored).
-    modifier: function
-        A function used to modify parameter attributes. If `param_keys` is empty, this is not used.
+    weight_modifier: function
+        A function used to modify weight attributes. If `param_keys` is empty, this is not used.
+    bias_modifier: function
+        A function used to modify bias attributes. If `param_keys` is empty, this is not used.
     param_keys: list[str], optional
         A list of parameters that shall be modified. If `None` (default), all parameters are modified (which may be
         none). If `[]`, no parameters are modified and `modifier` is ignored.
@@ -83,7 +85,10 @@ def mod_params(module, modifier, param_keys=None, require_params=True):
                 param = getattr(module, key)
                 if param is not None:
                     stored_tensors[key] = param.data
-                    param.data = modifier(param.data)
+                    if key == "bias":
+                        param.data = bias_modifier(param.data)
+                    else:
+                        param.data = weight_modifier(param.data)
         yield module
     finally:
         for key, value in stored_tensors.items():
@@ -208,21 +213,26 @@ class BasicHook(Hook):
     ----------
     input_modifiers: list[callable], optional
         A list of functions to produce multiple inputs. Default is a single input which is the identity.
-    param_modifiers: list[callable], optional
-        A list of functions to temporarily modify the parameters of the attached module for each input produced
-        with `input_modifiers`. Default is unmodified parameters for each input.
+    weight_modifiers: list[callable], optional
+        A list of functions to temporarily modify the weights of the attached module for each input produced
+        with `input_modifiers`. Default is unmodified weights for each input.
+    bias_modifiers: list[callable], optional
+        A list of functions to temporarily modify the biases of the attached module for each input produced
+        with `input_modifiers`. Default is unmodified biases for each input.
     output_modifiers: list[callable], optional
         A list of functions to modify the module's output computed using the modified parameters before gradient
         computation for each input produced with `input_modifier`. Default is the identity for each output.
     gradient_mapper: callable, optional
         Function to modify upper relevance. Call signature is of form `(grad_output, outputs)` and a tuple of
-        the same size as outputs is expected to be returned. `outputs` has the same size as `input_modifiers` and
-        `param_modifiers`. Default is a stabilized normalization by each of the outputs, multiplied with the output
+        the same size as outputs is expected to be returned. `outputs` has the same size as `input_modifiers`, `weight_modifiers`, and
+        `bias_modifiers`. Default is a stabilized normalization by each of the outputs, multiplied with the output
         gradient.
     reducer: callable
-        Function to reduce all the inputs and gradients produced through `input_modifiers` and `param_modifiers`.
+        Function to reduce all the inputs and gradients produced through `input_modifiers` `weight_modifiers`, and
+        `bias_modifiers`.
         Call signature is of form `(inputs, gradients)`, where `inputs` and `gradients` have the same as
-        `input_modifiers` and `param_modifiers`. Default is the sum of the multiplications of each input and its
+        `input_modifiers` `weight_modifiers`, and
+        `bias_modifiers`. Default is the sum of the multiplications of each input and its
         corresponding gradient.
     param_keys: list[str], optional
         A list of parameters that shall be modified. If `None` (default), all parameters are modified (which may be
@@ -234,7 +244,8 @@ class BasicHook(Hook):
     def __init__(
         self,
         input_modifiers=None,
-        param_modifiers=None,
+        weight_modifiers=None,
+        bias_modifiers=None,
         output_modifiers=None,
         gradient_mapper=None,
         reducer=None,
@@ -244,7 +255,8 @@ class BasicHook(Hook):
         super().__init__()
         modifiers = {
             'in': input_modifiers,
-            'param': param_modifiers,
+            'weight': weight_modifiers,
+            'bias': bias_modifiers,
             'out': output_modifiers,
         }
         supplied = {key for key, val in modifiers.items() if val is not None}
@@ -257,7 +269,8 @@ class BasicHook(Hook):
             reducer = self._default_reducer
 
         self.input_modifiers = modifiers['in']
-        self.param_modifiers = modifiers['param']
+        self.weight_modifiers = modifiers['weight']
+        self.bias_modifiers = modifiers['bias']
         self.output_modifiers = modifiers['out']
         self.gradient_mapper = gradient_mapper
         self.reducer = reducer
@@ -275,9 +288,9 @@ class BasicHook(Hook):
         param_kwargs = dict(param_keys=self.param_keys, require_params=self.require_params)
         inputs = []
         outputs = []
-        for in_mod, param_mod, out_mod in zip(self.input_modifiers, self.param_modifiers, self.output_modifiers):
+        for in_mod, weight_mod, bias_mod, out_mod in zip(self.input_modifiers, self.weight_modifiers, self.bias_modifiers, self.output_modifiers):
             input = in_mod(original_input).requires_grad_()
-            with mod_params(module, param_mod, **param_kwargs) as modified, torch.autograd.enable_grad():
+            with mod_params(module, weight_mod, bias_mod, **param_kwargs) as modified, torch.autograd.enable_grad():
                 output = modified.forward(input)
                 output = out_mod(output)
             inputs.append(input)
@@ -293,7 +306,8 @@ class BasicHook(Hook):
         '''
         return BasicHook(
             self.input_modifiers,
-            self.param_modifiers,
+            self.weight_modifiers,
+            self.bias_modifiers,
             self.output_modifiers,
             self.gradient_mapper,
             self.reducer,

@@ -19,8 +19,6 @@
 import numpy as np
 from PIL import Image
 
-import matplotlib.cm
-
 
 CMAPS = {}
 
@@ -41,64 +39,16 @@ def gray(x):
     return np.stack([x] * 3, axis=-1).clip(0., 1.)
 
 
-@register_cmap('wh_rd')
-def wh_rd(x):
+@register_cmap('wred')
+def wred(x):
     '''Color map from white to red.'''
     return np.stack([0. * x + 1., 1. - x, 1. - x], axis=-1).clip(0., 1.)
 
 
-@register_cmap('wh_bu')
-def wh_bu(x):
+@register_cmap('wblue')
+def wblue(x):
     '''Color map from white to blue.'''
     return np.stack([1. - x, 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
-
-
-@register_cmap('wh_gn')
-def wh_gn(x):
-    '''Color map from white to green.'''
-    return np.stack([1. - x, 0 * x + 1., 1. - 0.5 * x], axis=-1).clip(0., 1.)
-
-
-@register_cmap('wh_mg')
-def wh_mg(x):
-    '''Color map from white to magenta.'''
-    return np.stack([0 * x + 1., 1 - x, 0 * x + 1.], axis=-1).clip(0., 1.)
-
-
-@register_cmap('wh_cy')
-def wh_cy(x):
-    '''Color map from white to cyan.'''
-    return np.stack([1. - 230 / 255 * x, 1. - 40 / 255 * x, 1. - 55 / 255 * x], axis=-1).clip(0., 1.)
-
-
-@register_cmap('wh_bu')
-def wh_bu(x):
-    '''Color map from white to blue.'''
-    return np.stack([1. - x, 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
-
-
-@register_cmap('bk_mg')
-def bk_mg(x):
-    '''Color map from black to magenta.'''
-    return np.stack([1. * x, 0. * x, 1. * x], axis=-1).clip(0., 1.)
-
-
-@register_cmap('bk_yl')
-def bk_yl(x):
-    '''Color map from black to yellow.'''
-    return np.stack([1. * x, 1. * x, 0. * x], axis=-1).clip(0., 1.)
-
-
-@register_cmap('bk_or')
-def bk_or(x):
-    '''Color map from black to orange.'''
-    return np.stack([2. * x, 2. * x - 1, 0. * x], axis=-1).clip(0., 1.)
-
-
-@register_cmap('bk_cy')
-def bk_cy(x):
-    '''Color map from black to cyan.'''
-    return np.stack([0. * x, 1. * x, 1. * x], axis=-1).clip(0., 1.)
 
 
 @register_cmap('hot')
@@ -113,109 +63,23 @@ def cold(x):
     return np.stack([0. * x, x * 2. - 1., x * 2], axis=-1).clip(0., 1.)
 
 
-@register_cmap('bk_pu_mg')
-def bk_pu_mg(x):
-    '''Color map from black to purple to magenta.'''
-    return np.stack([x * 2. - 1., 0. * x, x * 2], axis=-1).clip(0., 1.)
-
-
-@register_cmap('bk_gn_cy')
-def bk_gn_cy(x):
-    '''Color map from black to green to cyan.'''
-    return np.stack([0. * x, x * 2, x * 2. - 1], axis=-1).clip(0., 1.)
-
-
 @register_cmap('coldnhot')
 def coldnhot(x):
-    '''Combination of color maps cold (reversed) and hot.
+    '''Combination of color maps cold (reveresed) and hot.
     Colors range from cyan to blue to black to red to yellow to white.
     '''
     return hot((2 * x - 1.).clip(0., 1.)) + cold(-(2 * x - 1.).clip(-1., 0.))
 
 
-@register_cmap('cy_gn_bk_pu_mg')
-def cy_gn_bk_pu_mg(x):
-    '''Combination of color maps bk_gn_cy (reversed) and bk_pu_mg
-    Colors range from cyan to green to black to purple to magenta.
-    '''
-    return bk_pu_mg((2 * x - 1.).clip(0., 1.)) + bk_gn_cy(-(2 * x - 1.).clip(-1., 0.))
-
-
-@register_cmap('mg_pu_bk_gr_cy')
-def mg_pu_bk_gr_cy(x):
-    '''Combination of color maps bk_pu_mg (reversed) and bk_gn_cy.
-    Colors range from magenta to purple to black to green to cyan.
-    '''
-    return bk_gn_cy((2 * x - 1.).clip(0., 1.)) + bk_pu_mg(-(2 * x - 1.).clip(-1., 0.))
-
-
-@register_cmap('cy_bk_mg')
-def cy_bk_mg(x):
-    '''Combination of color maps bk_cy (reversed) and bk_mg.
-    Colors range from cyan to black to magenta.
-    '''
-    return bk_mg((2 * x - 1.).clip(0., 1.)) + bk_cy(-(2 * x - 1.).clip(-1., 0.))
-
-
-@register_cmap('mg_bk_cy')
-def cy_bk_mg(x):
-    '''Combination of color maps bk_mg (reversed) and bk_cy.
-    Colors range from magenta to black to cyan.
-    '''
-    return bk_cy((2 * x - 1.).clip(0., 1.)) + bk_mg(-(2 * x - 1.).clip(-1., 0.))
-
-
-@register_cmap('yl_bk_mg')
-def yl_bk_mg(x):
-    '''Combination of color maps bk_yl (reversed) and bk_mg.
-    Colors range from yellow to black to magenta.
-    '''
-    return bk_mg((2 * x - 1.).clip(0., 1.)) + bk_yl(-(2 * x - 1.).clip(-1., 0.))
-
-
-@register_cmap('bu_wh_rd')
-def bu_wh_rd(x):
-    '''Combination of color maps wh_bu (reveresed) and wh_rd.
+@register_cmap('bwr')
+def bwr(x):
+    '''Combination of color maps blue (reveresed) and red.
     Colors range from blue to white to red.
     '''
-    return wh_rd((2 * x - 1.).clip(0., 1.)) + wh_bu(-(2 * x - 1.).clip(-1., 0.)) - 1.
+    return wred((2 * x - 1.).clip(0., 1.)) + wblue(-(2 * x - 1.).clip(-1., 0.)) - 1.
 
 
-@register_cmap('france')
-def france(x):
-    '''Combination of color maps wh_bu (reversed) and wh_rd (factor 0.85*0.96).
-    Colors range from blue to white to red.
-    '''
-    return 0.85 * (wh_rd((2 * x - 1.).clip(0., 1.)) + wh_bu(-(2 * x - 1.).clip(-1., 0.)) - 1.) *0.96
-
-
-@register_cmap('coleus')
-def coleus(x):
-    '''Combination of color maps wh_gn (reversed) and wh_mg (factor 0.85*0.96).
-    Colors range from magenta to grey to green.
-    '''
-    return 0.85 * (wh_mg((2 * x - 1.).clip(0., 1.)) + wh_gn(-(2 * x - 1.).clip(-1., 0.)) - 1.) *0.96
-
-
-@register_cmap('coolio')
-def coolio(x):
-    '''Combination of color maps wh_cy (reversed) and wh_mg (factor 0.85*0.96).
-    Colors range from cyan to grey to magenta.
-    '''
-    return 0.85 * (wh_mg((2 * x - 1.).clip(0., 1.)) + wh_cy(-(2 * x - 1.).clip(-1., 0.)) - 1.) *0.96
-
-
-@register_cmap('seismic085')
-def seismic085(x):
-    '''
-    Seismic, but sucks less.
-    '''
-    tmp = matplotlib.cm.get_cmap('seismic')(x)
-    tmp = tmp[..., 0:3]
-    return tmp*0.85
-
-
-def palette(cmap='bu_wh_rd', level=1.0):
+def palette(cmap='bwr', level=1.0):
     '''Create a 8-bit palette.
 
     Parameters
@@ -239,7 +103,7 @@ def palette(cmap='bu_wh_rd', level=1.0):
     return x
 
 
-def imgify(obj, vmin=None, vmax=None, cmap='bu_wh_rd', level=1.0):
+def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0):
     '''Convert an array with 1 or 3 channels to a PIL image.
     The color dimension can be either the first or the last dimension.
 
@@ -367,7 +231,7 @@ def gridify(obj, shape=None, fill_value=None):
     return result
 
 
-def imsave(fp, obj, vmin=None, vmax=None, cmap='bu_wh_rd', level=1.0, grid=False, format=None, writer_params=None):
+def imsave(fp, obj, vmin=None, vmax=None, cmap='bwr', level=1.0, grid=False, format=None, writer_params=None):
     '''Convert an array to an image and save it using file `fp`.
     Internally, `imgify` is called to create a PIL Image, which is then saved using PIL.
 
