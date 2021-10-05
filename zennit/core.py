@@ -302,7 +302,7 @@ class BasicHook(Hook):
         )
 
     @staticmethod
-    def _default_modifier(obj, _):
+    def _default_modifier(obj, name=None):
         return obj
 
     @staticmethod
