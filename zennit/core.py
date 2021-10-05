@@ -83,7 +83,7 @@ def mod_params(module, modifier, param_keys=None, require_params=True):
                 param = getattr(module, key)
                 if param is not None:
                     stored_tensors[key] = param.data
-                    param.data = modifier(param.data)
+                    param.data = modifier(param.data, key)
         yield module
     finally:
         for key, value in stored_tensors.items():
@@ -302,7 +302,7 @@ class BasicHook(Hook):
         )
 
     @staticmethod
-    def _default_modifier(obj):
+    def _default_modifier(obj, _):
         return obj
 
     @staticmethod

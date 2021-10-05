@@ -32,7 +32,7 @@ class Epsilon(BasicHook):
     def __init__(self, epsilon=1e-6):
         super().__init__(
             input_modifiers=[lambda input: input],
-            param_modifiers=[lambda param: param],
+            param_modifiers=[lambda param, _: param],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0], epsilon)),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
@@ -50,7 +50,7 @@ class Gamma(BasicHook):
     def __init__(self, gamma=0.25):
         super().__init__(
             input_modifiers=[lambda input: input],
-            param_modifiers=[lambda param: param + gamma * param.clamp(min=0)],
+            param_modifiers=[lambda param, _: param + gamma * param.clamp(min=0)],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
@@ -74,8 +74,8 @@ class ZPlus(BasicHook):
                 lambda input: input.clamp(max=0),
             ],
             param_modifiers=[
-                lambda param: param.clamp(min=0),
-                lambda param: param.clamp(max=0),
+                lambda param, _: param.clamp(min=0),
+                lambda param, name: param.clamp(max=0) if name != 'bias' else torch.zeros_like(param),
             ],
             output_modifiers=[lambda output: output] * 2,
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
@@ -107,10 +107,10 @@ class AlphaBeta(BasicHook):
                 lambda input: input.clamp(max=0),
             ],
             param_modifiers=[
-                lambda param: param.clamp(min=0),
-                lambda param: param.clamp(max=0),
-                lambda param: param.clamp(max=0),
-                lambda param: param.clamp(min=0),
+                lambda param, _: param.clamp(min=0),
+                lambda param, name: param.clamp(max=0) if name != 'bias' else torch.zeros_like(param),
+                lambda param, _: param.clamp(max=0),
+                lambda param, _: param.clamp(min=0),
             ],
             output_modifiers=[lambda output: output] * 4,
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
@@ -144,9 +144,9 @@ class ZBox(BasicHook):
                 lambda input: high[:input.shape[0]],
             ],
             param_modifiers=[
-                lambda param: param,
-                lambda param: param.clamp(min=0),
-                lambda param: param.clamp(max=0)
+                lambda param, _: param,
+                lambda param, _: param.clamp(min=0),
+                lambda param, _: param.clamp(max=0)
             ],
             output_modifiers=[lambda output: output] * 3,
             gradient_mapper=(lambda out_grad, outputs: (out_grad / stabilize(sub(*outputs)),) * 3),
@@ -184,7 +184,7 @@ class WSquare(BasicHook):
     def __init__(self):
         super().__init__(
             input_modifiers=[torch.ones_like],
-            param_modifiers=[lambda param: param ** 2],
+            param_modifiers=[lambda param, _: param ** 2],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: gradients[0])
@@ -197,7 +197,7 @@ class Flat(BasicHook):
     def __init__(self):
         super().__init__(
             input_modifiers=[torch.ones_like],
-            param_modifiers=[torch.ones_like],
+            param_modifiers=[lambda param, _: torch.ones_like(param)],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: gradients[0]),
