@@ -38,6 +38,14 @@ CMAPS = LazyColorMapCache({
     'coldnhot': '0ff,00f,80:000,f00,ff0,fff',
     # combination of wblue (reversed) and wred, centered around white
     'bwr': '00f,80:fff,f00',
+    # red to white to blue as in the french flag
+    'france': '0055a4,80:fff,ef4135',
+    # red to white to blue with brightness 0xd0
+    'seismic': 'd00000,80:d0d0d0,0000d0',
+    # cyan to white to magenta with brightness 0xd0
+    'coolio': '00d0d0,80:d0d0d0,d000d0',
+    # green to white to magenta with brightness 0xd0
+    'coleus': '00d000,80:d0d0d0,d000d0',
 })
 
 
