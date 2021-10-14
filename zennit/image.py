@@ -19,88 +19,69 @@
 import numpy as np
 from PIL import Image
 
-
-CMAPS = {}
-
-
-def register_cmap(name):
-    '''Decorator to register a color map.'''
-    def wrapped(func):
-        '''Wrapped function to register a color map with name `name`.'''
-        CMAPS[name] = func
-        return func
-
-    return wrapped
+from .cmap import LazyColorMapCache, ColorMap
 
 
-@register_cmap('gray')
-def gray(x):
-    '''Color map from black to white.'''
-    return np.stack([x] * 3, axis=-1).clip(0., 1.)
+# CMAPS contains all built-in color maps
+CMAPS = LazyColorMapCache({
+    # black to white
+    'gray': '000,fff',
+    # white to red
+    'wred': 'fff,f00',
+    # white to blue
+    'wblue': 'fff,00f',
+    # black to red to yellow to white
+    'hot': '000,f00,ff0,fff',
+    # black to blue to cyan
+    'cold': '000,00f,0ff',
+    # combination of cold (reversed) and hot, centered around black
+    'coldnhot': '0ff,00f,80:000,f00,ff0,fff',
+    # combination of wblue (reversed) and wred, centered around white
+    'bwr': '00f,80:fff,f00',
+})
 
 
-@register_cmap('wred')
-def wred(x):
-    '''Color map from white to red.'''
-    return np.stack([0. * x + 1., 1. - x, 1. - x], axis=-1).clip(0., 1.)
-
-
-@register_cmap('wblue')
-def wblue(x):
-    '''Color map from white to blue.'''
-    return np.stack([1. - x, 1. - x, 0 * x + 1.], axis=-1).clip(0., 1.)
-
-
-@register_cmap('hot')
-def hot(x):
-    '''Color map from black to red to yellow to white.'''
-    return np.stack([x * 3., x * 3. - 1, x * 3 - 2], axis=-1).clip(0., 1.)
-
-
-@register_cmap('cold')
-def cold(x):
-    '''Color map from black to blue to cyan.'''
-    return np.stack([0. * x, x * 2. - 1., x * 2], axis=-1).clip(0., 1.)
-
-
-@register_cmap('coldnhot')
-def coldnhot(x):
-    '''Combination of color maps cold (reveresed) and hot.
-    Colors range from cyan to blue to black to red to yellow to white.
-    '''
-    return hot((2 * x - 1.).clip(0., 1.)) + cold(-(2 * x - 1.).clip(-1., 0.))
-
-
-@register_cmap('bwr')
-def bwr(x):
-    '''Combination of color maps blue (reveresed) and red.
-    Colors range from blue to white to red.
-    '''
-    return wred((2 * x - 1.).clip(0., 1.)) + wblue(-(2 * x - 1.).clip(-1., 0.)) - 1.
-
-
-def palette(cmap='bwr', level=1.0):
-    '''Create a 8-bit palette.
+def get_cmap(cmap):
+    '''Convenience function to lookup built-in color maps, or create color maps from a source code.
 
     Parameters
     ----------
-    cmap: str
-        String to describe the color map used to create the palette.
+    cmap : str or ColorMap
+        String to specify a built-in color map, code used to create a new color map, or a ColorMap instance.
+
+    Returns
+    -------
+    ColorMap
+        The built-in color map with key `cmap` in CMAPS, a new color map created from the code `cmap`, or `cmap` if it
+        already was a ColorMap.
+    '''
+    if isinstance(cmap, ColorMap):
+        return cmap
+    elif cmap in CMAPS:
+        return CMAPS[cmap]
+    return ColorMap(cmap)
+
+
+def palette(cmap='bwr', level=1.0):
+    '''Convenience function to create palettes from built-in colormaps, or from a source code if necessary.
+
+    Parameters
+    ----------
+    cmap: str or ColorMap
+        String to specify a built-in color map, code used to create a new color map, or a ColorMap instance, which will
+        be used to create a palette.
     level: float
-        The level of the color map. 1.0 is default. Values below zero reduce the color range, with only a single color
-        used at value 0.0. Values above 1.0 clip the value earlier towards the maximum, with an increasingly steep
-        transition at the center of the image.
+        The level of the color map palette. 1.0 is default. Values below zero reduce the color range, with only a
+        single color used at value 0.0. Values above 1.0 clip the value earlier towards the maximum, with an
+        increasingly steep transition at the center of the color map range.
 
     Returns
     -------
     obj:`numpy.ndarray`
         The palette described by an unsigned 8-bit numpy array with 256 entries.
     '''
-    x = np.linspace(-1., 1., 256) * level
-    x = ((x + 1.) / 2).clip(0., 1.)
-    x = CMAPS[cmap](x)
-    x = (x * 255.).clip(0., 255.).astype(np.uint8)
-    return x
+    colormap = get_cmap(cmap)
+    return colormap.palette(level=level)
 
 
 def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0):
@@ -116,9 +97,10 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0):
         Minimum value of the array.
     vmax: float or obj:`numpy.ndarray`
         Maximum value of the array.
-    cmap: str
-        Color-map described by a string. Possible values are in the CMAPS dict. The color map will only be applied for
-        arrays with only a single color channel. The color will be specified as a palette in the PIL Image.
+    cmap: str or ColorMap
+        String to specify a built-in color map, code used to create a new color map, or a ColorMap instance, which will
+        be used to create a palette. The color map will only be applied for arrays with only a single color channel.
+        The color will be specified as a palette in the PIL Image.
     level: float
         The level of the color map. 1.0 is default. Values below zero reduce the color range, with only a single color
         used at value 0.0. Values above 1.0 clip the value earlier towards the maximum, with an increasingly steep
@@ -246,9 +228,10 @@ def imsave(fp, obj, vmin=None, vmax=None, cmap='bwr', level=1.0, grid=False, for
         Minimum value of the array.
     vmax: float or obj:`numpy.ndarray`
         Maximum value of the array.
-    cmap: str
-        Color-map described by a string. Possible values are in the CMAPS dict. The color map will only be applied for
-        arrays with only a single color channel. The color will be specified as a palette in the PIL Image.
+    cmap: str or ColorMap
+        String to specify a built-in color map, code used to create a new color map, or a ColorMap instance, which will
+        be used to create a palette. The color map will only be applied for arrays with only a single color channel.
+        The color will be specified as a palette in the PIL Image.
     level: float
         The level of the color map. 1.0 is default. Values below zero reduce the color range, with only a single color
         used at value 0.0. Values above 1.0 clip the value earlier towards the maximum, with an increasingly steep
