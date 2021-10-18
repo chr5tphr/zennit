@@ -110,10 +110,15 @@ class AlphaBeta(BasicHook):
                 lambda param, _: param.clamp(min=0),
                 lambda param, name: param.clamp(max=0) if name != 'bias' else torch.zeros_like(param),
                 lambda param, _: param.clamp(max=0),
-                lambda param, _: param.clamp(min=0),
+                lambda param, name: param.clamp(min=0) if name != 'bias' else torch.zeros_like(param),
             ],
             output_modifiers=[lambda output: output] * 4,
-            gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
+            gradient_mapper=(
+                lambda out_grad, outputs: [
+                    out_grad / stabilize(denom)
+                    for output, denom in zip(outputs, [sum(outputs[:2])] * 2 + [sum(outputs[2:])] * 2)
+                ]
+            ),
             reducer=(
                 lambda inputs, gradients: (
                     alpha * (inputs[0] * gradients[0] + inputs[1] * gradients[1])
