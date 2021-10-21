@@ -1,2 +1,3 @@
+zennit
 sphinx-copybutton>=0.4.0
 sphinx-rtd-theme>=1.0.0
