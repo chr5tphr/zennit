@@ -1,16 +1,18 @@
 # Zennit
 ![Zennit-Logo](https://raw.githubusercontent.com/chr5tphr/zennit/master/share/img/zennit.png)
 
+[![Documentation Status](https://readthedocs.org/projects/zennit/badge/?version=latest)](https://zennit.readthedocs.io/en/latest/?badge=latest)
 
 Zennit (**Z**ennit **e**xplains **n**eural **n**etworks **i**n **t**orch)
 is a high-level framework in Python using PyTorch for explaining/exploring neural networks.
 Its design philosophy is intended to provide high customizability and integration as a standardized solution
 for applying LRP-based attribution methods in research.
 
-
 Zennit is currently under development and has not yet reached a stable state.
 Interfaces may change suddenly and without warning, so please be careful when attempting to use Zennit in its current
 state.
+
+The latest documentation is hosted on Read the Docs at [zennit.readthedocs.io](https://zennit.readthedocs.io/en/latest/).
 
 If you find Zennit useful for your research, please consider citing our related [paper](https://arxiv.org/abs/2106.13200):
 ```
