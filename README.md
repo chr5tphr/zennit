@@ -2,6 +2,8 @@
 ![Zennit-Logo](https://raw.githubusercontent.com/chr5tphr/zennit/master/share/img/zennit.png)
 
 [![Documentation Status](https://readthedocs.org/projects/zennit/badge/?version=latest)](https://zennit.readthedocs.io/en/latest/?badge=latest)
+[![PyPI Version](https://img.shields.io/pypi/v/zennit)](https://pypi.org/project/zennit/)
+[![License](https://img.shields.io/pypi/l/zennit)](https://github.com/chr5tphr/zennit/blob/master/COPYING.LESSER)
 
 Zennit (**Z**ennit **e**xplains **n**eural **n**etworks **i**n **t**orch)
 is a high-level framework in Python using PyTorch for explaining/exploring neural networks.
