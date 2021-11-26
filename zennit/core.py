@@ -70,7 +70,7 @@ def mod_params(module, modifier, param_keys=None, require_params=True):
         The `module` with appropriate parameters temporarily modified.
     '''
     try:
-        stored_tensors = {}
+        stored_params = {}
         if param_keys is None:
             param_keys = [name for name, _ in module.named_parameters(recurse=False)]
 
@@ -82,12 +82,12 @@ def mod_params(module, modifier, param_keys=None, require_params=True):
             if key not in missing:
                 param = getattr(module, key)
                 if param is not None:
-                    stored_tensors[key] = param.data
-                    param.data = modifier(param.data, key)
+                    stored_params[key] = param
+                    setattr(module, key, torch.nn.Parameter(modifier(param.data, key)))
         yield module
     finally:
-        for key, value in stored_tensors.items():
-            getattr(module, key).data = value
+        for key, value in stored_params.items():
+            setattr(module, key, value)
 
 
 def collect_leaves(module):
