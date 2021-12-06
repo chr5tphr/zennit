@@ -21,7 +21,7 @@ from abc import ABCMeta, abstractmethod
 import torch
 
 from .core import collect_leaves
-from .types import Linear, BatchNorm
+from .types import Linear, BatchNorm, ConvolutionTranspose
 
 
 class Canonizer(metaclass=ABCMeta):
@@ -134,8 +134,13 @@ class MergeBatchNorm(Canonizer):
                 )
             original_bias = module.bias.data
 
+            if isinstance(module, ConvolutionTranspose):
+                index = (None, slice(None), *((None,) * (original_weight.ndim - 2)))
+            else:
+                index = (slice(None), *((None,) * (original_weight.ndim - 1)))
+
             # merge batch_norm into linear layer
-            module.weight.data = (original_weight * scale[:, None, None, None])
+            module.weight.data = (original_weight * scale[index])
             module.bias.data = (original_bias - batch_norm.running_mean) * scale + batch_norm.bias
 
         # change batch_norm parameters to produce identity
