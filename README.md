@@ -140,7 +140,7 @@ $ .venv/bin/python feed_forward.py \
     --cmap hot
 ```
 
-The following is a slightly modified exerpt of `share/example/feed_forward.py`:
+The following is a slightly modified excerpt of `share/example/feed_forward.py`:
 ```python
 ...
     # the maximal input shape, needed for the ZBox rule
