@@ -73,7 +73,7 @@ class SpecialFirstLayerMapComposite(LayerMapComposite):
 
     def mapping(self, ctx, name, module):
         '''Get the appropriate hook given a mapping from module types to hooks and a special mapping for the first
-        occurence in another mapping.
+        occurrence in another mapping.
 
         Parameters
         ----------
