@@ -68,7 +68,7 @@ The following computes LRP relevance using the ``EpsilonPlusFlat`` composite:
 
     # compute the output and gradient within the composite's context
     with composite.context(model) as modified_model:
-        output = model(input)
+        output = modified_model(input)
         # gradient/ relevance wrt. class/output 0
         output.backward(gradient=torch.eye(10)[[0]])
         # relevance is not accumulated in .grad if using torch.autograd.grad
