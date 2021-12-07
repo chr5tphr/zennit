@@ -56,7 +56,7 @@ def mod_params(module, modifier, param_keys=None, require_params=True):
         A list of parameters that shall be modified. If `None` (default), all parameters are modified (which may be
         none). If `[]`, no parameters are modified and `modifier` is ignored.
     require_params: bool, optional
-        Whether existance of `module`'s params is mandatory (True by default). If the attribute exists but is `None`,
+        Whether existence of `module`'s params is mandatory (True by default). If the attribute exists but is `None`,
         it is not considered missing, and the modifier is not applied.
 
     Raises
@@ -228,7 +228,7 @@ class BasicHook(Hook):
         A list of parameters that shall be modified. If `None` (default), all parameters are modified (which may be
         none). If `[]`, no parameters are modified and `modifier` is ignored.
     require_params: bool, optional
-        Whether existance of `module`'s params is mandatory (True by default). If the attribute exists but is `None`,
+        Whether existence of `module`'s params is mandatory (True by default). If the attribute exists but is `None`,
         it is not considered missing, and the modifier is not applied.
     '''
     def __init__(
