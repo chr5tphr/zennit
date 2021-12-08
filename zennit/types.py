@@ -31,15 +31,29 @@ class SubclassMeta(type):
         return type.__subclasscheck__(cls, sub) or issubclass(sub, candidates)
 
 
-class Convolution(metaclass=SubclassMeta):
-    '''Abstract base class that describes convolutional modules.'''
+class ConvolutionTranspose(metaclass=SubclassMeta):
+    '''Abstract base class that describes transposed convolutional modules.'''
+    __subclass__ = (
+        torch.nn.modules.conv.ConvTranspose1d,
+        torch.nn.modules.conv.ConvTranspose2d,
+        torch.nn.modules.conv.ConvTranspose3d,
+    )
+
+
+class ConvolutionStandard(metaclass=SubclassMeta):
+    '''Abstract base class that standard (forward) convolutional modules.'''
     __subclass__ = (
         torch.nn.modules.conv.Conv1d,
         torch.nn.modules.conv.Conv2d,
         torch.nn.modules.conv.Conv3d,
-        torch.nn.modules.conv.ConvTranspose1d,
-        torch.nn.modules.conv.ConvTranspose2d,
-        torch.nn.modules.conv.ConvTranspose3d,
+    )
+
+
+class Convolution(metaclass=SubclassMeta):
+    '''Abstract base class that describes all convolutional modules.'''
+    __subclass__ = (
+        ConvolutionStandard,
+        ConvolutionTranspose,
     )
 
 
