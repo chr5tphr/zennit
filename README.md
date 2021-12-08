@@ -9,6 +9,8 @@ Zennit (**Z**ennit **e**xplains **n**eural **n**etworks **i**n **t**orch)
 is a high-level framework in Python using PyTorch for explaining/exploring neural networks.
 Its design philosophy is intended to provide high customizability and integration as a standardized solution
 for applying LRP-based attribution methods in research.
+Zennit strictly requires models to use PyTorch's `torch.nn.Module` structure
+(including activation functions).
 
 Zennit is currently under development and has not yet reached a stable state.
 Interfaces may change suddenly and without warning, so please be careful when attempting to use Zennit in its current

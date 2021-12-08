@@ -24,9 +24,11 @@ Basic Usage
 -----------
 
 Zennit implements propagation-based attribution methods by overwriting the
-gradient of PyTorch modules in PyTorch's auto-differentiation engine. The
-following demonstrates a setup to compute Layerwise Relevance Propagation (LRP)
-relevance for a simple model and random data.
+gradient of PyTorch modules in PyTorch's auto-differentiation engine. This means
+that Zennit will only work on models which are strictly implemented using
+PyTorch modules, including activation functions. The following demonstrates a
+setup to compute Layerwise Relevance Propagation (LRP) relevance for a simple
+model and random data.
 
 .. code-block:: python
 
@@ -43,7 +45,8 @@ relevance for a simple model and random data.
     )
     input = torch.randn(1, 3, 32, 32)
 
-The most important high-level structures in Zennit are ``Composites``, ``Attributors`` and ``Canonizers``.
+The most important high-level structures in Zennit are ``Composites``,
+``Attributors`` and ``Canonizers``.
 
 
 Composites
@@ -121,7 +124,8 @@ may be combined with propagation-based (composite) approaches.
 
     print('SmoothGrad:', relevance)
 
-More information on attributors can be found in :doc:`/how-to/use-attributors` and :doc:`/how-to/write-custom-attributors`.
+More information on attributors can be found in :doc:`/how-to/use-attributors`
+and :doc:`/how-to/write-custom-attributors`.
 
 Canonizers
 ^^^^^^^^^^
@@ -157,7 +161,10 @@ be simply supplied when instantiating a composite:
 Some pre-defined canonizers for models from ``torchvision`` can be found in
 :py:mod:`zennit.torchvision`. The :py:class:`zennit.torchvision.VGGCanonizer`
 specifically is simply :py:class:`zennit.canonizers.SequentialMergeBatchNorm`,
-which may be used when ``BatchNorm`` is used in sequential models. For more
+which may be used when ``BatchNorm`` is used in sequential models. Note that for
+``SequentialMergeBatchNorm`` to work, all functions (linear layers, activations,
+...) must be modules and assigned to their parent module in the order they are
+visited (see :py:class:`zennit.canonizers.SequentialMergeBatchNorm`). For more
 information on canonizers see :doc:`/how-to/use-composites-and-canonizers` and
 :doc:`/how-to/write-custom-canonizers`.
 
