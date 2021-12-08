@@ -147,8 +147,8 @@ The following is a slightly modified excerpt of `share/example/feed_forward.py`:
     shape = (batch_size, 3, 224, 224)
 
     composite_kwargs = {
-        'low': norm_fn(torch.zeros(*shape, device=device)),  # the highest and ...
-        'high': norm_fn(torch.ones(*shape, device=device)),  # the lowest pixel value for ZBox
+        'low': norm_fn(torch.zeros(*shape, device=device)),  # the lowest and ...
+        'high': norm_fn(torch.ones(*shape, device=device)),  # the highest pixel value for ZBox
         'canonizers': [VGG16Canonizer()]  # the torchvision specific vgg16 canonizer
     }
 
