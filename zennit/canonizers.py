@@ -151,7 +151,17 @@ class MergeBatchNorm(Canonizer):
 
 
 class SequentialMergeBatchNorm(MergeBatchNorm):
-    '''Canonizer to merge the parameters of all batch norms that appear sequentially right after a linear module.'''
+    '''Canonizer to merge the parameters of all batch norms that appear sequentially right after a linear module.
+
+    Note
+    ----
+    SequentialMergeBatchNorm traverses the tree of children of the provided module depth-first and in-order.
+    This means that child-modules must be assigned to their parent module in the order they are visited in the forward
+    pass to correctly identify adjacent modules.
+    This also means that activation functions must be assigned in their module-form as a child to their parent-module
+    to properly detect when there is an activation function between linear and batch-norm modules.
+
+    '''
     def apply(self, root_module):
         '''Finds a batch norm following right after a linear layer, and creates a copy of this instance to merge
         them by fusing the batch norm parameters into the linear layer and reducing the batch norm to the identity.
