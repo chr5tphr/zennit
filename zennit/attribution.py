@@ -15,7 +15,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with this library. If not, see <https://www.gnu.org/licenses/>.
-'''Attributors are convenience objects to compute an attributions, optionally using composites.'''
+'''Attributors are convenience objects to compute attributions, optionally using composites.'''
 from abc import ABCMeta, abstractmethod
 from functools import partial
 from itertools import product
