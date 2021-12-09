@@ -204,7 +204,7 @@ def main(
                 relevance = np.abs(relevance)
                 relevance /= relevance.max((1, 2), keepdims=True)
             elif relevance_norm == 'unaligned':
-                # do not align, the orignal minimum value becomes 0., the orignal maximum becomes 1.
+                # do not align, the original minimum value becomes 0., the original maximum becomes 1.
                 rmin = relevance.min((1, 2), keepdims=True)
                 rmax = relevance.max((1, 2), keepdims=True)
                 relevance = (relevance - rmin) / (rmax - rmin)
