@@ -15,7 +15,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with this library. If not, see <https://www.gnu.org/licenses/>.
-'''Attributors are convienence objects to compute an attributions, optionally using composites.'''
+'''Attributors are convenience objects to compute an attributions, optionally using composites.'''
 from abc import ABCMeta, abstractmethod
 from functools import partial
 from itertools import product
@@ -42,7 +42,7 @@ def occlude_independent(input, mask, fill_fn=torch.zeros_like, invert=False):
 class Attributor(metaclass=ABCMeta):
     '''Base Attributor Class.
 
-    Attributors are convienience objects with an optional composite and when called, compute an attribution, e.g., the
+    Attributors are convenience objects with an optional composite and when called, compute an attribution, e.g., the
     gradient or anything that is the result of computing the gradient when using the provided composite.  Attributors
     also provide a context to be used in a `with` statement, similar to `CompositeContext`s. If the forward function
     (or `self.__call__`) is called and the composite has not been registered (i.e. `composite.handles` is empty), the
