@@ -83,11 +83,11 @@ The following computes LRP relevance using the ``EpsilonPlusFlat`` composite:
 
 The context created by :py:func:`zennit.core.Composite.context` registers the
 composite, which means that all rules are applied according to the composite's
-mapping. See :doc:`/how-to/use-composites-and-canonizers` for information on
+mapping. See :doc:`/how-to/use-rules-composites-and-canonizers` for information on
 using composites, :py:mod:`zennit.composites` for an API reference and
 :doc:`/how-to/write-custom-compositors` for writing new compositors. Available
-``Rules`` can be found in :py:func:`zennit.rules`, their use is described in
-:doc:`/how-to/write-custom-rules` and how to add new ones is described in
+``Rules`` can be found in :py:mod:`zennit.rules`, their use is described in
+:doc:`/how-to/use-rules-composites-and-canonizers` and how to add new ones is described in
 :doc:`/how-to/write-custom-rules`.
 
 Attributors
@@ -165,7 +165,7 @@ which may be used when ``BatchNorm`` is used in sequential models. Note that for
 ``SequentialMergeBatchNorm`` to work, all functions (linear layers, activations,
 ...) must be modules and assigned to their parent module in the order they are
 visited (see :py:class:`zennit.canonizers.SequentialMergeBatchNorm`). For more
-information on canonizers see :doc:`/how-to/use-composites-and-canonizers` and
+information on canonizers see :doc:`/how-to/use-rules-composites-and-canonizers` and
 :doc:`/how-to/write-custom-canonizers`.
 
 
