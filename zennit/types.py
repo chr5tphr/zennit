@@ -41,7 +41,7 @@ class ConvolutionTranspose(metaclass=SubclassMeta):
 
 
 class ConvolutionStandard(metaclass=SubclassMeta):
-    '''Abstract base class that standard (forward) convolutional modules.'''
+    '''Abstract base class that describes standard (forward) convolutional modules.'''
     __subclass__ = (
         torch.nn.modules.conv.Conv1d,
         torch.nn.modules.conv.Conv2d,
