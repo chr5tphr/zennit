@@ -380,7 +380,7 @@ class Occlusion(Attributor):
         if isinstance(window, int):
             window = tuple(min(window, size) for size in input.shape)
         if isinstance(stride, int):
-            window = tuple(min(stride, size) for size in input.shape)
+            stride = tuple(min(stride, size) for size in input.shape)
 
         if len(window) < input.ndim:
             window = tuple(input.shape)[:input.ndim - len(window)] + window
