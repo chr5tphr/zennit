@@ -44,6 +44,7 @@ Rules can be instantiated, after which they may be used directly:
 
 .. code-block:: python
 
+    import torch
     from torch.nn import Conv2d
     from zennit.rules import Epsilon
 
@@ -142,7 +143,7 @@ Composites may require arguments, e.g.
 
     import torch
     from torch.nn import Sequential, Conv2d, ReLU, Linear, Flatten
-
+    from zennit.composites import EpsilonGammaBox
 
     # setup the model
     model = Sequential(
@@ -191,7 +192,7 @@ and using :py:func:`~zennit.core.Composite.context`:
     # note that model and modified_model are the same model, the context
     # variable is purely visual
     # hooks are removed when the context is exited
-    with composite.context(model) as modified model
+    with composite.context(model) as modified_model:
         # execute the hooked/modified model
         output = modified_model(input)
         # compute the attribution via the gradient
@@ -283,11 +284,11 @@ mapping from module name to rule:
     print(list(model.named_modules()))
 
     # manually write a rule mapping:
-    composite = NameMapComposite(
+    composite = NameMapComposite([
         (['conv0'], ZBox(low, high)),
         (['conv1'], ZPlus()),
         (['linear0', 'linear1'], Epsilon()),
-    )
+    ])
 
 Modules built using :py:class:`torch.nn.Sequential` without explicit names will have a
 number string as their name. Explicitly assigning a module to a parent module as
@@ -344,17 +345,17 @@ While not recommended, **Canonizers** can be used on their own:
     from torch.nn import Sequential, Conv2d, ReLU, Linear, Flatten, BatchNorm2d
     from zennit.canonizers import SequentialMergeBatchNorm
 
-     # setup the model
-     model = Sequential(
-         Conv2d(3, 8, 3, padding=1),
-         ReLU(),
-         Conv2d(8, 16, 3, padding=1),
-         BatchNorm2d(),
-         ReLU(),
-         Flatten(),
-         Linear(16 * 32 * 32, 1024),
-         ReLU(),
-         Linear(1024, 10),
+    # setup the model
+    model = Sequential(
+        Conv2d(3, 8, 3, padding=1),
+        ReLU(),
+        Conv2d(8, 16, 3, padding=1),
+        BatchNorm2d(16),
+        ReLU(),
+        Flatten(),
+        Linear(16 * 32 * 32, 1024),
+        ReLU(),
+        Linear(1024, 10),
     )
 
     # create the canonizer
