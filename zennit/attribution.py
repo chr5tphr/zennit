@@ -346,10 +346,11 @@ class Occlusion(Attributor):
         default, all values except inside the sliding window will be occluded.
     window: int or tuple of ints, optional
         The size of the sliding window to occlude over the input for each dimension. Defaults to 8. If a single integer
-        is provided, the sliding window will slide over all dimensions with the same size. If a tuple is provided, the
-        window will only slide over the n-last dimensions, where n is the length of the tuple, e.g., if the data has
-        shape `(3, 32, 32)` and `window=(8, 8)`, the resulting mask will have a block of shape `(3, 8, 8)` set to True.
-        `window` must have the same length as `stride`.
+        is provided, the sliding window will slide with the same size over all dimensions except the first, which is
+        assumed as the batch-dimension. If a tuple is provided, the window will only slide over the n-last dimensions,
+        where n is the length of the tuple, e.g., if the data has shape `(3, 32, 32)` and `window=(8, 8)`, the
+        resulting mask will have a block of shape `(3, 8, 8)` set to True. `window` must have the same length as
+        `stride`.
     stride: int or tuple of ints, optional
         The strides used for the sliding window to occlude over the input for each dimension. Defaults to 8. If a
         single integer is provided, the strides will be the same size for all dimensions. If a tuple is provided,
@@ -378,9 +379,9 @@ class Occlusion(Attributor):
         window = self.window
         stride = self.stride
         if isinstance(window, int):
-            window = tuple(min(window, size) for size in input.shape)
+            window = tuple(min(window, size) for size in input.shape[1:])
         if isinstance(stride, int):
-            stride = tuple(min(stride, size) for size in input.shape)
+            stride = tuple(min(stride, size) for size in input.shape[1:])
 
         if len(window) < input.ndim:
             window = tuple(input.shape)[:input.ndim - len(window)] + window
