@@ -39,8 +39,19 @@ extensions = [
     'sphinx.ext.imgmath',
     'sphinx.ext.extlinks',
     'sphinx_rtd_theme',
-    'sphinx_copybutton'
+    'sphinx_copybutton',
+    'sphinxcontrib.datatemplates',
 ]
+
+
+def config_inited_handler(app, config):
+    os.makedirs(os.path.join(app.srcdir, app.config.generated_path), exist_ok=True)
+
+
+def setup(app):
+    app.add_config_value('generated_path', '_generated', 'env')
+    app.connect('config-inited', config_inited_handler)
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
