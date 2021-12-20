@@ -92,7 +92,7 @@ def palette(cmap='bwr', level=1.0):
     return colormap.palette(level=level)
 
 
-def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm=None):
+def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm=None, grid=False, gridfill=None):
     '''Convert an array with 1 or 3 channels to a PIL image.
     The color dimension can be either the first or the last dimension.
 
@@ -110,9 +110,9 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm=None):
         be used to create a palette. The color map will only be applied for arrays with only a single color channel.
         The color will be specified as a palette in the PIL Image.
     level: float
-        The level of the color map. 1.0 is default. Values below zero reduce the color range, with only a single color
+        The level of the color map. 1.0 is default. Values below 1.0 reduce the color range, with only a single color
         used at value 0.0. Values above 1.0 clip the value earlier towards the maximum, with an increasingly steep
-        transition at the center of the image.
+        transition at the center of the pixel value distribution.
     norm : str, optional
         If supplied, specifies the norm that should be used. Available options are ``'symmetric'``, ``'absolute'``,
         ``'unaligned'`` or ``None`` (default). ``'symmetric'`` normalizes with both minimum and maximum by the absolute
@@ -120,6 +120,12 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm=None):
         to be the distance to zero, relative to the absolute maximum. ``'unaligned'`` will result in the minimum value
         to be directly mapped to 0 and the maximum value to be directly mapped to 1. ``None`` (default) enables manual
         ``vmin`` and ``vmax``. Otherwise ``vmin`` and ``vmax`` are ineffective.
+    grid : bool or tuple of ints of size 2
+        If true, assumes the first dimension to be the batch dimension. If True, creates a square grid of images in the
+        batch dimension after normalizing each sample. If tuple of ints of size 2, creates the grid in the shape of
+        ``(height, width)``. If False (default), does not assume a batch dimension.
+    gridfill: :py:obj:`np.uint8`
+        A value to fill empty grid members. Default is the mean pixel value. No effect when ``grid=False``.
 
     Returns
     -------
@@ -131,33 +137,59 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm=None):
     except TypeError as err:
         raise TypeError('Could not cast instance of \'{}\' to numpy array.'.format(str(type(obj)))) from err
 
-    if len(array.shape) not in (2, 3):
-        raise TypeError('Input has to have either 2 or 3 axes!')
+    if grid:
+        if isinstance(grid, (list, tuple)) and len(grid) != 2:
+            raise TypeError('Grid shape needs to be of size 2!')
 
-    if (len(array.shape) == 3) and (array.shape[2] not in (1, 3)):
-        if array.shape[0] in (1, 3):
-            array = array.transpose(1, 2, 0)
-        else:
-            raise TypeError(
-                'Last (or first) axis of input are color channels, '
-                'which have to either be 1, 3 or be omitted entirely!'
-            )
+        if array.ndim not in (3, 4):
+            raise TypeError('Grid input has to have either 3 or 4 axes!')
+
+        if (array.ndim == 4) and (array.shape[3] not in (1, 3)):
+            if array.shape[1] in (1, 3):
+                array = array.transpose(0, 2, 3, 1)
+            else:
+                raise TypeError(
+                    'After batch, last (or first) axis of input are color channels, '
+                    'which have to either be 1, 3 or be omitted entirely!'
+                )
+    else:
+        if array.ndim not in (2, 3):
+            raise TypeError('Input has to have either 2 or 3 axes!')
+
+        if (array.ndim == 3) and (array.shape[2] not in (1, 3)):
+            if array.shape[0] in (1, 3):
+                array = array.transpose(1, 2, 0)
+            else:
+                raise TypeError(
+                    'Last (or first) axis of input are color channels, '
+                    'which have to either be 1, 3 or be omitted entirely!'
+                )
 
     # renormalize data if necessary
     if array.dtype != np.uint8:
+        if grid:
+            dims = tuple(range(1, array.ndim))
+        else:
+            dims = tuple(range(array.ndim))
+
         if norm is None:
             if vmin is None:
-                vmin = array.min()
+                vmin = array.min(dims)
             if vmax is None:
-                vmax = array.max()
+                vmax = array.max(dims)
             array = (array - vmin) / (vmax - vmin)
         else:
-            array = interval_norm(array, norm=norm, dim=tuple(range(array.ndim)))
+            array = interval_norm(array, norm=norm, dim=dims)
         array = (array * 255).clip(0, 255).astype(np.uint8)
 
-    # add missing axis if omitted
-    if len(array.shape) == 2:
-        array = array[:, :, None]
+    if grid:
+        shape = None if isinstance(grid, bool) else grid
+        # gridify adds the missing axis
+        array = gridify(array, shape=shape, fill_value=gridfill)
+    else:
+        # add missing axis if omitted
+        if array.ndim == 2:
+            array = array[:, :, None]
 
     # apply palette if single channel
     if array.shape[2] == 1:
@@ -175,12 +207,12 @@ def gridify(obj, shape=None, fill_value=None):
     Parameters
     ----------
     obj: object
-        An object that can be converted to a numpy array, with 3 (grayscale) or 4 (rgb) axes.
+        An object that can be converted to a numpy array, with 3 (greyscale) or 4 (rgb) axes.
         The color channel's position is automatically detected, and moved to the back of the shape.
     shape: tuple of size 2, optional
         Height and width of the produced grid. If None (default), create a square grid.
     fill_value: float or obj:`numpy.ndarray`
-        A value to fill empty grid members. May be any compatible shape to `obj`.
+        A value to fill empty grid members. Default is the mean pixel value.
 
     Returns
     -------
@@ -192,11 +224,11 @@ def gridify(obj, shape=None, fill_value=None):
         array = np.array(obj)
     except TypeError as err:
         raise TypeError('Could not cast instance of \'{}\' to numpy array.'.format(str(type(obj)))) from err
-    if len(array.shape) not in (3, 4):
-        raise TypeError('For creating an image grid, the array has to have either 3 (grayscale) or 4 (rgb) axes!')
+    if array.ndim not in (3, 4):
+        raise TypeError('For creating an image grid, the array has to have either 3 (greyscale) or 4 (rgb) axes!')
 
     # add missing axis if omitted
-    if len(array.shape) == 3:
+    if array.ndim == 3:
         array = array[..., None]
 
     if array.shape[3] not in (1, 3):
@@ -218,6 +250,8 @@ def gridify(obj, shape=None, fill_value=None):
 
     if fill_value is None:
         fill_value = array.min((0, 1, 2), keepdims=True)
+    else:
+        fill_value = np.array(fill_value).astype(array.dtype)
 
     dim = min(num, grid_height * grid_width)
     result = np.zeros((grid_height * grid_width, height, width, channels), dtype=array.dtype) + fill_value
@@ -233,7 +267,17 @@ def gridify(obj, shape=None, fill_value=None):
 
 
 def imsave(
-    fp, obj, vmin=None, vmax=None, cmap='bwr', level=1.0, grid=False, format=None, writer_params=None, norm=None
+    fp,
+    obj,
+    vmin=None,
+    vmax=None,
+    cmap='bwr',
+    level=1.0,
+    grid=False,
+    format=None,
+    writer_params=None,
+    norm=None,
+    gridfill=None,
 ):
     '''Convert an array to an image and save it using file `fp`.
     Internally, `imgify` is called to create a PIL Image, which is then saved using PIL.
@@ -254,11 +298,13 @@ def imsave(
         be used to create a palette. The color map will only be applied for arrays with only a single color channel.
         The color will be specified as a palette in the PIL Image.
     level: float
-        The level of the color map. 1.0 is default. Values below zero reduce the color range, with only a single color
+        The level of the color map. 1.0 is default. Values below 1.0 reduce the color range, with only a single color
         used at value 0.0. Values above 1.0 clip the value earlier towards the maximum, with an increasingly steep
-        transition at the center of the image.
-    grid: bool
-        If True, align multiple arrays (in dimension 0) into a grid before creating an image.
+        transition at the center of the pixel value distribution.
+    grid : bool or tuple of ints of size 2
+        If true, assumes the first dimension to be the batch dimension. If True, creates a square grid of images in the
+        batch dimension after normalizing each sample. If tuple of ints of size 2, creates the grid in the shape of
+        ``(height, width)``. If False (default), does not assume a batch dimension.
     format: str
         Optional format override for PIL Image.save.
     writer_params: dict
@@ -268,14 +314,14 @@ def imsave(
         ``'unaligned'`` or ``None`` (default). ``'symmetric'`` normalizes with both minimum and maximum by the absolute
         maximum, which will cause 0. in the input to correspond to 0.5 in the result. ``'absolute'`` causes the result
         to be the distance to zero, relative to the absolute maximum. ``'unaligned'`` will result in the minimum value
-        to be directly mapped to 0 and the maximum value to be directly mapped to 1. ``None`` (default) enables manual
-        ``vmin`` and ``vmax``. Otherwise ``vmin`` and ``vmax`` are ineffective.
+        to be directly mapped to 0 and the maximum value to be directly mapped to 1. ``vmin`` and ``vmax` may be used
+        to manually override the minimum and maximum value respectively.
+    gridfill: :py:obj:`np.uint8`
+        A value to fill empty grid members. Default is the mean pixel value. No effect when ``grid=False``.
     '''
     if writer_params is None:
         writer_params = {}
-    if grid:
-        obj = gridify(obj)
-    image = imgify(obj, vmin=vmin, vmax=vmax, cmap=cmap, level=level, norm=norm)
+    image = imgify(obj, vmin=vmin, vmax=vmax, cmap=cmap, level=level, norm=norm, grid=grid, gridfill=gridfill)
     image.save(fp, format=format, **writer_params)
 
 
