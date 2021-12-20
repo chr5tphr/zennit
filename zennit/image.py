@@ -92,19 +92,19 @@ def palette(cmap='bwr', level=1.0):
     return colormap.palette(level=level)
 
 
-def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0):
+def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm=None):
     '''Convert an array with 1 or 3 channels to a PIL image.
     The color dimension can be either the first or the last dimension.
 
     Parameters
     ----------
     obj: object
-        Anything that can be converted to a numpy array with 2 dimensions grayscale, or 3 dimensions with 1 or 3 values
+        Anything that can be converted to a numpy array with 2 dimensions greyscale, or 3 dimensions with 1 or 3 values
         in the first or last dimension (color).
     vmin: float or obj:`numpy.ndarray`
-        Minimum value of the array.
+        Minimum value of the array. Overridden when supplying ``norm``.
     vmax: float or obj:`numpy.ndarray`
-        Maximum value of the array.
+        Maximum value of the array. Overridden when supplying ``norm``.
     cmap: str or ColorMap
         String to specify a built-in color map, code used to create a new color map, or a ColorMap instance, which will
         be used to create a palette. The color map will only be applied for arrays with only a single color channel.
@@ -113,6 +113,13 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0):
         The level of the color map. 1.0 is default. Values below zero reduce the color range, with only a single color
         used at value 0.0. Values above 1.0 clip the value earlier towards the maximum, with an increasingly steep
         transition at the center of the image.
+    norm : str, optional
+        If supplied, specifies the norm that should be used. Available options are ``'symmetric'``, ``'absolute'``,
+        ``'unaligned'`` or ``None`` (default). ``'symmetric'`` normalizes with both minimum and maximum by the absolute
+        maximum, which will cause 0. in the input to correspond to 0.5 in the result. ``'absolute'`` causes the result
+        to be the distance to zero, relative to the absolute maximum. ``'unaligned'`` will result in the minimum value
+        to be directly mapped to 0 and the maximum value to be directly mapped to 1. ``None`` (default) enables manual
+        ``vmin`` and ``vmax``. Otherwise ``vmin`` and ``vmax`` are ineffective.
 
     Returns
     -------
@@ -138,11 +145,15 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0):
 
     # renormalize data if necessary
     if array.dtype != np.uint8:
-        if vmin is None:
-            vmin = array.min()
-        if vmax is None:
-            vmax = array.max()
-        array = ((array - vmin) * 255 / (vmax - vmin)).clip(0, 255).astype(np.uint8)
+        if norm is None:
+            if vmin is None:
+                vmin = array.min()
+            if vmax is None:
+                vmax = array.max()
+            array = (array - vmin) / (vmax - vmin)
+        else:
+            array = interval_norm(array, norm=norm, dim=tuple(range(array.ndim)))
+        array = (array * 255).clip(0, 255).astype(np.uint8)
 
     # add missing axis if omitted
     if len(array.shape) == 2:
@@ -221,7 +232,9 @@ def gridify(obj, shape=None, fill_value=None):
     return result
 
 
-def imsave(fp, obj, vmin=None, vmax=None, cmap='bwr', level=1.0, grid=False, format=None, writer_params=None):
+def imsave(
+    fp, obj, vmin=None, vmax=None, cmap='bwr', level=1.0, grid=False, format=None, writer_params=None, norm=None
+):
     '''Convert an array to an image and save it using file `fp`.
     Internally, `imgify` is called to create a PIL Image, which is then saved using PIL.
 
@@ -230,12 +243,12 @@ def imsave(fp, obj, vmin=None, vmax=None, cmap='bwr', level=1.0, grid=False, for
     fp: str, obj:`pathlib.Path` or file
         Save target for PIL Image.
     obj: object
-        Anything that can be converted to a numpy array with 2 dimensions grayscale, or 3 dimensions with 1 or 3 values
+        Anything that can be converted to a numpy array with 2 dimensions greyscale, or 3 dimensions with 1 or 3 values
         in the first or last dimension (color).
     vmin: float or obj:`numpy.ndarray`
-        Minimum value of the array.
+        Minimum value of the array. Overridden when supplying ``norm``.
     vmax: float or obj:`numpy.ndarray`
-        Maximum value of the array.
+        Maximum value of the array. Overridden when supplying ``norm``.
     cmap: str or ColorMap
         String to specify a built-in color map, code used to create a new color map, or a ColorMap instance, which will
         be used to create a palette. The color map will only be applied for arrays with only a single color channel.
@@ -250,10 +263,64 @@ def imsave(fp, obj, vmin=None, vmax=None, cmap='bwr', level=1.0, grid=False, for
         Optional format override for PIL Image.save.
     writer_params: dict
         Extra params to the image writer in PIL.
+    norm : str, optional
+        If supplied, specifies the norm that should be used. Available options are ``'symmetric'``, ``'absolute'``,
+        ``'unaligned'`` or ``None`` (default). ``'symmetric'`` normalizes with both minimum and maximum by the absolute
+        maximum, which will cause 0. in the input to correspond to 0.5 in the result. ``'absolute'`` causes the result
+        to be the distance to zero, relative to the absolute maximum. ``'unaligned'`` will result in the minimum value
+        to be directly mapped to 0 and the maximum value to be directly mapped to 1. ``None`` (default) enables manual
+        ``vmin`` and ``vmax``. Otherwise ``vmin`` and ``vmax`` are ineffective.
     '''
     if writer_params is None:
         writer_params = {}
     if grid:
         obj = gridify(obj)
-    image = imgify(obj, vmin=vmin, vmax=vmax, cmap=cmap, level=level)
+    image = imgify(obj, vmin=vmin, vmax=vmax, cmap=cmap, level=level, norm=norm)
     image.save(fp, format=format, **writer_params)
+
+
+def interval_norm(input, norm='unaligned', dim=None):
+    '''Normalize the data interval batch-wise between 0. and 1. given the specified strategy.
+
+    Parameters
+    ----------
+    input : :py:class:`numpy.ndarray`
+        Array which will be normalized.
+    norm : str, optional
+        Specifies the used norm. Available options are ``'symmetric'``, ``'absolute'`` and ``'unaligned'`` (default).
+        ``'symmetric'`` normalizes with both minimum and maximum by the absolute maximum, which will cause 0. in the
+        input to correspond to 0.5 in the result. ``'absolute'`` causes the result to be the distance to zero, relative
+        to the absolute maximum. ``'unaligned'`` will result in the minimum value to be directly mapped to 0 and the
+        maximum value to be directly mapped to 1.
+    dim : int or tuple of ints, optional
+        Set the channel dimension over which will be summed (default is 1).
+
+    Returns
+    -------
+    :py:class:`numpy.ndarray`
+        The normalized array ``input`` along ``dim`` to lie in the interval [0, 1].
+
+    Raises
+    ------
+    RuntimeError
+        If `norm` is not in (``'symmetric'``, ``'absolute'``, ``'unaligned'``).
+
+    '''
+    if dim is None:
+        dim = tuple(range(1, input.ndim))
+
+    if norm == 'symmetric':
+        # 0-aligned symmetric input, negative and positive can be compared, the original 0. becomes 0.5
+        vmax = np.abs(input).max(dim, keepdims=True)
+        vmin = -vmax
+    elif norm == 'absolute':
+        input = np.abs(input)
+        vmax = input.max(dim, keepdims=True)
+        vmin = 0.
+    elif norm == 'unaligned':
+        # do not align, the original minimum value becomes 0., the original maximum becomes 1.
+        vmax = input.max(dim, keepdims=True)
+        vmin = input.min(dim, keepdims=True)
+    else:
+        raise RuntimeError(f'No such norm mode: \'{norm}\'')
+    return (input - vmin) / (vmax - vmin)
