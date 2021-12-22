@@ -92,7 +92,7 @@ def palette(cmap='bwr', level=1.0):
     return colormap.palette(level=level)
 
 
-def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm='unaligned', grid=False, gridfill=None):
+def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, symmetric=False, grid=False, gridfill=None):
     '''Convert an array with 1 or 3 channels to a PIL image.
     The color dimension can be either the first or the last dimension.
 
@@ -113,13 +113,12 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm='unaligned', g
         The level of the color map. 1.0 is default. Values below 1.0 reduce the color range, with only a single color
         used at value 0.0. Values above 1.0 clip the value earlier towards the maximum, with an increasingly steep
         transition at the center of the pixel value distribution.
-    norm : str, optional
-        Specifies the norm that should be used. Available options are ``'symmetric'``, ``'absolute'`` or
-        ``'unaligned'``(default). ``'symmetric'`` normalizes with both minimum and maximum by the absolute
-        maximum, which will cause 0. in the input to correspond to 0.5 in the result. ``'absolute'`` causes the result
-        to be the distance to zero, relative to the absolute maximum. ``'unaligned'`` will result in the minimum value
-        to be directly mapped to 0 and the maximum value to be directly mapped to 1. ``vmin`` and ``vmax` may be used
-        to manually override the minimum and maximum value respectively.
+    symmetric : bool, optional
+        Specifies whether the norm should be symmetric (True) or unaligned (False, default). If True, normalize with
+        both minimum and maximum by the absolute maximum, which will cause 0. in the input to correspond to 0.5 in the
+        result. Setting ``symmetric=False`` (default) will result in the minimum value to be directly mapped to 0 and
+        the maximum value to be directly mapped to 1. ``vmin`` and ``vmax`` may be used to manually override the
+        minimum and maximum value respectively.
     grid : bool or tuple of ints of size 2
         If true, assumes the first dimension to be the batch dimension. If True, creates a square grid of images in the
         batch dimension after normalizing each sample. If tuple of ints of size 2, creates the grid in the shape of
@@ -173,7 +172,7 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, norm='unaligned', g
             dims = tuple(range(array.ndim))
 
         if None in (vmin, vmax):
-            vmin_, vmax_ = interval_norm_bounds(array, norm=norm, dim=dims)
+            vmin_, vmax_ = interval_norm_bounds(array, symmetric=symmetric, dim=dims)
         if vmin is None:
             vmin = vmin_
         if vmax is None:
@@ -276,7 +275,7 @@ def imsave(
     grid=False,
     format=None,
     writer_params=None,
-    norm='unaligned',
+    symmetric=False,
     gridfill=None,
 ):
     '''Convert an array to an image and save it using file `fp`.
@@ -309,64 +308,51 @@ def imsave(
         Optional format override for PIL Image.save.
     writer_params: dict
         Extra params to the image writer in PIL.
-    norm : str, optional
-        Specifies the norm that should be used. Available options are ``'symmetric'``, ``'absolute'`` or
-        ``'unaligned'``(default). ``'symmetric'`` normalizes with both minimum and maximum by the absolute
-        maximum, which will cause 0. in the input to correspond to 0.5 in the result. ``'absolute'`` causes the result
-        to be the distance to zero, relative to the absolute maximum. ``'unaligned'`` will result in the minimum value
-        to be directly mapped to 0 and the maximum value to be directly mapped to 1. ``vmin`` and ``vmax` may be used
-        to manually override the minimum and maximum value respectively.
+    symmetric : bool, optional
+        Specifies whether the norm should be symmetric (True) or unaligned (False, default). If True, normalize with
+        both minimum and maximum by the absolute maximum, which will cause 0. in the input to correspond to 0.5 in the
+        result. Setting ``symmetric=False`` (default) will result in the minimum value to be directly mapped to 0 and
+        the maximum value to be directly mapped to 1. ``vmin`` and ``vmax`` may be used to manually override the
+        minimum and maximum value respectively.
     gridfill: :py:obj:`np.uint8`
         A value to fill empty grid members. Default is the mean pixel value. No effect when ``grid=False``.
     '''
     if writer_params is None:
         writer_params = {}
-    image = imgify(obj, vmin=vmin, vmax=vmax, cmap=cmap, level=level, norm=norm, grid=grid, gridfill=gridfill)
+    image = imgify(obj, vmin=vmin, vmax=vmax, cmap=cmap, level=level, symmetric=symmetric, grid=grid, gridfill=gridfill)
     image.save(fp, format=format, **writer_params)
 
 
-def interval_norm_bounds(input, norm='unaligned', dim=None):
+def interval_norm_bounds(input, symmetric=False, dim=None):
     '''Return the boundaries to normalize the data interval batch-wise between 0. and 1. given the specified strategy.
 
     Parameters
     ----------
     input : :py:class:`numpy.ndarray`
         Array for which to return the boundaries.
-    norm : str, optional
-        Specifies the used norm. Available options are ``'symmetric'``, ``'absolute'`` and ``'unaligned'`` (default).
-        ``'symmetric'`` normalizes with both minimum and maximum by the absolute maximum, which will cause 0. in the
-        input to correspond to 0.5 in the result. ``'absolute'`` causes the result to be the distance to zero, relative
-        to the absolute maximum. ``'unaligned'`` will result in the minimum value to be directly mapped to 0 and the
-        maximum value to be directly mapped to 1.
+    symmetric : bool, optional
+        Specifies whether the norm should be symmetric (True) or unaligned (False, default).
+        If True, normalize with both minimum and maximum by the absolute maximum, which will cause 0. in the
+        input to correspond to 0.5 in the result. Setting ``symmetric=False`` (default) will result in the minimum
+        value to be directly mapped to 0 and the maximum value to be directly mapped to 1.
     dim : tuple of ints, optional
-        Set the channel dimensions over which the boundaries are computed (default is `tuple(range(1, input.ndim))`.
+        Set the channel dimensions over which the boundaries are computed (default is ``tuple(range(1, input.ndim))``.
 
     Returns
     -------
     :py:class:`numpy.ndarray`
         The normalized array ``input`` along ``dim`` to lie in the interval [0, 1].
 
-    Raises
-    ------
-    RuntimeError
-        If `norm` is not in (``'symmetric'``, ``'absolute'``, ``'unaligned'``).
-
     '''
     if dim is None:
         dim = tuple(range(1, input.ndim))
 
-    if norm == 'symmetric':
+    if symmetric:
         # 0-aligned symmetric input, negative and positive can be compared, the original 0. becomes 0.5
         vmax = np.abs(input).max(dim, keepdims=True)
         vmin = -vmax
-    elif norm == 'absolute':
-        input = np.abs(input)
-        vmax = input.max(dim, keepdims=True)
-        vmin = 0.
-    elif norm == 'unaligned':
+    else:
         # do not align, the original minimum value becomes 0., the original maximum becomes 1.
         vmax = input.max(dim, keepdims=True)
         vmin = input.min(dim, keepdims=True)
-    else:
-        raise RuntimeError(f'No such norm mode: \'{norm}\'')
     return vmin, vmax
