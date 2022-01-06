@@ -63,7 +63,7 @@ class ColorMap:
     _rexp = re.compile(
         r'(?P<longcolor>[0-9a-fA-F]{6})|'
         r'(?P<shortcolor>[0-9a-fA-F]{3})|'
-        r'(?P<index>[0-9a-fA-F]{2})|'
+        r'(?P<index>[0-9a-fA-F]{1,2})|'
         r'(?P<adsep>:)|'
         r'(?P<sep>,)|'
         r'(?P<whitespace>\s+)|'
@@ -103,7 +103,10 @@ class ColorMap:
                 log.append(token)
             elif token.type in ('shortcolor', 'longcolor'):
                 if len(log) == 2 and log[-2].type == 'index':
-                    index = int(log[-2].value, base=16)
+                    indval = log[-2].value
+                    if len(indval) == 1:
+                        indval = indval * 2
+                    index = int(indval, base=16)
                 elif not log:
                     index = None
                 else:
@@ -112,7 +115,7 @@ class ColorMap:
                 if token.type == 'shortcolor':
                     value = tuple(int(char * 2, base=16) for char in token.value)
                 elif token.type == 'longcolor':
-                    value = tuple(int(''.join(chars), base=16) for chars in zip(token.value[0::2], token.value[1::2]))
+                    value = tuple(int(''.join(chars), base=16) for chars in zip(*[iter(token.value)] * 2))
 
                 log.append(token)
                 nodes.append(ColorNode(index, np.array(value)))
