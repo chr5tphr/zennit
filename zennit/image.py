@@ -173,10 +173,16 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, symmetric=False, gr
 
         if None in (vmin, vmax):
             vmin_, vmax_ = interval_norm_bounds(array, symmetric=symmetric, dim=dims)
+
         if vmin is None:
             vmin = vmin_
+        else:
+            vmin = np.array(vmin)
+
         if vmax is None:
             vmax = vmax_
+        else:
+            vmax = np.array(vmax)
 
         array = (array - vmin) / (vmax - vmin)
         array = (array * 255).clip(0, 255).astype(np.uint8)
