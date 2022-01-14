@@ -24,19 +24,20 @@ import torch
 
 
 def stabilize(input, epsilon=1e-6):
-    '''Stabilize input for safe division.
+    '''Stabilize input for safe division. This shifts zero-elements by ``+ epsilon``. For the sake of the
+    *epsilon rule*, this also shifts positive values by ``+ epsilon`` and negative values by ``- epsilon``.
 
     Parameters
     ----------
-    input: obj:`torch.Tensor`
+    input: :py:obj:`torch.Tensor`
         Tensor to stabilize.
     epsilon: float, optional
-        Value to replace zero elements with.
+        Value by which to shift elements.
 
     Returns
     -------
-    obj:`torch.Tensor`
-        New Tensor copied from `input` with all zero elements set to epsilon.
+    :py:obj:`torch.Tensor`
+        New Tensor copied from `input` with values shifted by epsilon.
     '''
     return input + ((input == 0.).to(input) + input.sign()) * epsilon
 
