@@ -77,7 +77,8 @@ def mod_params(module, modifier, param_keys=None, require_params=True):
 
         missing = [key for key in param_keys if not hasattr(module, key)]
         if require_params and missing:
-            raise RuntimeError('Module {} requires missing parameters: \'{}\''.format(module, '\', \''.join(missing)))
+            missing_str = '\', \''.join(missing)
+            raise RuntimeError(f'Module {module} requires missing parameters: \'{missing_str}\'')
 
         for key in param_keys:
             if key not in missing:
