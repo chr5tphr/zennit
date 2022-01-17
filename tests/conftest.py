@@ -10,6 +10,7 @@ from torch.nn import BatchNorm1d, BatchNorm2d, BatchNorm3d
 
 
 def prodict(**kwargs):
+    '''Create a dictionary with values which are the cartesian product of the input keyword arguments.'''
     return [dict(zip(kwargs, val)) for val in product(*kwargs.values())]
 
 
@@ -21,6 +22,7 @@ def prodict(**kwargs):
     ]]
 ])
 def rng(request):
+    '''Random number generator fixture.'''
     return torch.manual_seed(request.param)
 
 
@@ -35,12 +37,14 @@ def rng(request):
     ),
 ])
 def module_linear(rng, request):
+    '''Fixture for linear modules.'''
     module_type, kwargs = request.param
     return module_type(**kwargs).to(torch.float64).eval()
 
 
 @pytest.fixture(scope='session')
 def module_batchnorm(module_linear):
+    '''Fixture for BatchNorm-type modules, based on adjacent linear module.'''
     module_map = [
         ((Linear, Conv1d, ConvTranspose1d), BatchNorm1d),
         ((Conv2d, ConvTranspose2d), BatchNorm2d),
@@ -72,6 +76,7 @@ def module_batchnorm(module_linear):
 
 @pytest.fixture(scope='session')
 def data_input(rng, module_linear):
+    '''Fixture to create data for a linear module, given an RNG.'''
     shape = (4,)
     setups = [
         (Conv1d, 1, 1),
