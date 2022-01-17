@@ -81,6 +81,7 @@ class ColorMap:
 
     @source.setter
     def source(self, value):
+        '''Set source code property and re-compile the color map.'''
         try:
             tokens = self._lex(value)
             nodes = self._parse(tokens)
