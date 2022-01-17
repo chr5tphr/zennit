@@ -65,7 +65,7 @@ def get_cmap(cmap):
     '''
     if isinstance(cmap, ColorMap):
         return cmap
-    elif cmap in CMAPS:
+    if cmap in CMAPS:
         return CMAPS[cmap]
     return ColorMap(cmap)
 
@@ -134,7 +134,7 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, symmetric=False, gr
     try:
         array = np.array(obj)
     except TypeError as err:
-        raise TypeError('Could not cast instance of \'{}\' to numpy array.'.format(str(type(obj)))) from err
+        raise TypeError(f'Could not cast \'{obj}\' to numpy array.') from err
 
     if grid:
         if isinstance(grid, (list, tuple)) and len(grid) != 2:
@@ -228,7 +228,7 @@ def gridify(obj, shape=None, fill_value=None):
     try:
         array = np.array(obj)
     except TypeError as err:
-        raise TypeError('Could not cast instance of \'{}\' to numpy array.'.format(str(type(obj)))) from err
+        raise TypeError(f'Could not cast \'{obj}\' to numpy array.') from err
     if array.ndim not in (3, 4):
         raise TypeError('For creating an image grid, the array has to have either 3 (greyscale) or 4 (rgb) axes!')
 
