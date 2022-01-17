@@ -24,16 +24,64 @@ import torch
 
 
 def constant(obj):
+    '''Wrapper function to create a function which returns a constant object regardless of arguments.
+
+    Parameters
+    ----------
+    obj : object
+        Constant object which the returned wrapper function will return on call.
+
+    Returns
+    -------
+    wrapped_const : function
+        Function which when called with any arguments will return ``obj``.
+
+    '''
     def wrapped_const(*args, **kwargs):
         return obj
     return wrapped_const
 
 
 def identity(obj):
+    '''Identity function.
+
+    Parameters
+    ----------
+    obj : object
+        Any object which will be returned.
+
+    Result
+    ------
+    obj : object
+        The original input argument ``obj``.
+
+    '''
     return obj
 
 
 def occlude_independent(input, mask, fill_fn=torch.zeros_like, invert=False):
+    '''Given a ``mask``, occlude pixels of ``input`` independently given a function ``fill_fn``.
+
+    Parameters
+    ----------
+    input : :py:obj:`torch.Tensor`
+        The input tensor which will be occluded in the pixels where ``mask`` is non-zero, or, if ``invert`` is
+        ``True``, where ``mask`` is zero, using function ``fill_fn``.
+    mask : :py:obj:`torch.Tensor`
+        Boolean mask, at which non-zero or zero (given ``invert``) elements will be occluded in ``input``.
+    fill_fn : function, optional
+        Function used to occlude pixels with signature ``(input : torch.Tensor) -> torch.Tensor``, where input is the
+        same shape as ``input``, and the output shall leave the shape unchanged. Default is ``torch.zeros_like``, which
+        will replace occluded pixels with zero.
+    invert : bool, optional
+        If ``True``, inverts the supplied mask. Default is ``False``, i.e. not to invert.
+
+    Returns
+    -------
+    :py:obj:`torch.Tensor`
+        The occluded tensor.
+
+    '''
     if invert:
         mask = ~mask
     return input * mask + ~mask * fill_fn(input)
@@ -150,8 +198,9 @@ class Attributor(metaclass=ABCMeta):
 
 
 class Gradient(Attributor):
-    '''The Gradient Attributor. The result is the product of the attribution output and the (possibly modified) jacobian.
-    With a composite, i.e. `EpsilonGammaBox`, this will compute the Layerwise Relevance Propagation attribution values.
+    '''The Gradient Attributor. The result is the product of the attribution output and the (possibly modified)
+    jacobian. With a composite, i.e. `EpsilonGammaBox`, this will compute the Layerwise Relevance Propagation
+    attribution values.
     '''
     def forward(self, input, attr_output_fn):
         '''Compute the gradient of the model wrt. input, by using `attr_output_fn` as the function of the model output
@@ -278,8 +327,8 @@ class IntegratedGradients(Attributor):
     References
     ----------
     .. [2] M. Sundararajan, A. Taly, and Q. Yan, “Axiomatic attribution for deep networks,” in Proceedings of the 34th
-       International Conference on Machine Learning, ICML 2017, Sydney, NSW, Australia, 6-11 August 2017, ser. Proceedings
-       of Machine Learning Research, D. Precup and Y. W. Teh, Eds., vol. 70. PMLR, 2017, pp. 3319–3328.
+       International Conference on Machine Learning, ICML 2017, Sydney, NSW, Australia, 6-11 August 2017, ser.
+       Proceedings of Machine Learning Research, D. Precup and Y. W. Teh, Eds., vol. 70. PMLR, 2017, pp. 3319–3328.
 
     '''
     def __init__(self, model, composite=None, attr_output=None, baseline_fn=None, n_iter=20):
