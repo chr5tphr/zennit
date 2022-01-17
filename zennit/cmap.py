@@ -71,7 +71,8 @@ class ColorMap:
     )
 
     def __init__(self, source):
-        self._source = source
+        self._source = None
+        self.source = source
 
     @property
     def source(self):
