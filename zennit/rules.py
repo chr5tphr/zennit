@@ -211,12 +211,14 @@ class Flat(BasicHook):
 
 
 class ReLUDeconvNet(Hook):
+    '''Hook to modify ReLU gradient according to DeconvNet.'''
     def backward(self, module, grad_input, grad_output):
         '''Modify ReLU gradient according to DeconvNet.'''
         return (grad_output[0].clamp(min=0),)
 
 
 class ReLUGuidedBackprop(Hook):
+    '''Hook to modify ReLU gradient according to GuidedBackprop.'''
     def backward(self, module, grad_input, grad_output):
         '''Modify ReLU gradient according to GuidedBackprop.'''
         return (grad_input[0] * (grad_output[0] > 0.),)
