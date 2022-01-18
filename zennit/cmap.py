@@ -53,12 +53,6 @@ class ColorMap:
     source : str
         Source code to generate the color map.
 
-    Attributes
-    ----------
-    source : str
-        Source code used to generate the color map. May be overwrittten with a new string, which will be compiled to
-        change the color map.
-
     '''
     _rexp = re.compile(
         r'(?P<longcolor>[0-9a-fA-F]{6})|'
@@ -75,12 +69,14 @@ class ColorMap:
         self.source = source
 
     @property
-    def source(self):
-        '''Source code property. Assignment causes re-compilation.'''
+    def source(self) -> str:
+        '''Source code property used to generate the color map. May be overwritten with a new string, which will be
+        compiled to change the color map.
+        '''
         return self._source
 
     @source.setter
-    def source(self, value):
+    def source(self, value: str):
         '''Set source code property and re-compile the color map.'''
         try:
             tokens = self._lex(value)
