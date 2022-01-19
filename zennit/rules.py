@@ -78,7 +78,7 @@ class ZPlus(BasicHook):
                 lambda param, name: param.clamp(max=0) if name != 'bias' else torch.zeros_like(param),
             ],
             output_modifiers=[lambda output: output] * 2,
-            gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(output) for output in outputs]),
+            gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(sum(outputs))] * 2),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0] + inputs[1] * gradients[1])
         )
 
