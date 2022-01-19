@@ -18,7 +18,7 @@
 '''Rules based on Hooks'''
 import torch
 
-from .core import Hook, BasicHook, stabilize
+from .core import Hook, BasicHook, stabilize, expand
 
 
 class Epsilon(BasicHook):
@@ -145,8 +145,8 @@ class ZBox(BasicHook):
         super().__init__(
             input_modifiers=[
                 lambda input: input,
-                lambda input: low[:input.shape[0]],
-                lambda input: high[:input.shape[0]],
+                lambda input: expand(low, input.shape, cut_batch_dim=True).to(input),
+                lambda input: expand(high, input.shape, cut_batch_dim=True).to(input),
             ],
             param_modifiers=[
                 lambda param, _: param,

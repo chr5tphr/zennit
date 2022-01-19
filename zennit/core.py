@@ -42,6 +42,56 @@ def stabilize(input, epsilon=1e-6):
     return input + ((input == 0.).to(input) + input.sign()) * epsilon
 
 
+def expand(tensor, shape, cut_batch_dim=False):
+    '''Expand a scalar value or tensor to a shape. In addition to torch.Tensor.expand, this will also accept
+    non-torch.tensor objects, which will be used to create a new tensor. If ``tensor`` has fewer dimensions than
+    ``shape``, singleton dimension will be appended to match the size of ``shape`` before expanding.
+
+    Parameters
+    ----------
+    tensor : int, float or :py:obj:`torch.Tensor`
+        Scalar or tensor to expand to the size of ``shape``.
+    shape : tuple[int]
+        Shape to which ``tensor`` will be expanded.
+    cut_batch_dim : bool, optional
+        If True, take only the first ``shape[0]`` entries along dimension 0 of the expanded ``tensor``, if it has more
+        entries in dimension 0 than ``shape``. Default (False) is not to cut, which will instead cause a
+        ``RuntimeError`` due to the size mismatch.
+
+    Returns
+    -------
+    :py:obj:`torch.Tensor`
+        A new tensor expanded from ``tensor`` with shape ``shape``.
+
+    Raises
+    ------
+    RuntimeError
+        If ``tensor`` could not be expanded to ``shape`` due to incompatible shapes.
+
+    '''
+    if not isinstance(tensor, torch.Tensor):
+        # cast non-tensor scalar to 0-dim tensor
+        tensor = torch.tensor(tensor)
+    if tensor.ndim == 0:
+        # expand scalar tensors
+        return tensor.expand(shape)
+    if tensor.ndim < len(shape) and all(left in (1, right) for left, right in zip(tensor.shape, shape)):
+        # append singleton dimensions if tensor has fewer dimensions, and the existing ones match with shape
+        tensor = tensor[(...,) + (None,) * (len(shape) - len(tensor.shape))]
+    if tensor.ndim == len(shape):
+        # if the dims match completely (lenghts match and zipped match), expand normally
+        if all(left in (1, right) for left, right in zip(tensor.shape, shape)):
+            return tensor.expand(shape)
+        # if `cut_batch_dim` and dims match except first, which is larger than shape, the the first dim and expand
+        if (
+            cut_batch_dim
+            and all(left in (1, right) for left, right in zip(tensor.shape[1:], shape[1:]))
+            and tensor.shape[0] > shape[0]
+        ):
+            return tensor[:shape[0]].expand(shape)
+    raise RuntimeError('Invalid shape! Target: {tensor.shape}; Source: {shape}')
+
+
 @contextmanager
 def mod_params(module, modifier, param_keys=None, require_params=True):
     '''Context manager to temporarily modify parameter attributes (all by default) of a module.
