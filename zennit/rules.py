@@ -202,7 +202,9 @@ class Flat(BasicHook):
     def __init__(self):
         super().__init__(
             input_modifiers=[torch.ones_like],
-            param_modifiers=[lambda param, _: torch.ones_like(param)],
+            param_modifiers=[
+                lambda param, name: torch.ones_like(param) if name != 'bias' else torch.zeros_like(param)
+            ],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: gradients[0]),
