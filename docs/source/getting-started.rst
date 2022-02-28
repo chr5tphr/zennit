@@ -85,7 +85,7 @@ The context created by :py:func:`zennit.core.Composite.context` registers the
 composite, which means that all rules are applied according to the composite's
 mapping. See :doc:`/how-to/use-rules-composites-and-canonizers` for information on
 using composites, :py:mod:`zennit.composites` for an API reference and
-:doc:`/how-to/write-custom-compositors` for writing new compositors. Available
+:doc:`/how-to/write-custom-composites` for writing new compositors. Available
 ``Rules`` can be found in :py:mod:`zennit.rules`, their use is described in
 :doc:`/how-to/use-rules-composites-and-canonizers` and how to add new ones is described in
 :doc:`/how-to/write-custom-rules`.
