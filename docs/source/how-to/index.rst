@@ -12,7 +12,7 @@ These How-Tos give more detailed information on how to use Zennit.
     use-attributors
     visualize-results
     get-intermediate-relevance
-    write-custom-compositors
+    write-custom-composites
     write-custom-canonizers
     write-custom-rules
     write-custom-attributors

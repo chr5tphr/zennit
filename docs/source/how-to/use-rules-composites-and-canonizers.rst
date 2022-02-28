@@ -296,7 +296,7 @@ an attribute will assign the attribute as the child module's name. Nested
 modules will have their names split by a dot ``.``.
 
 To create custom composites following more complex patterns, see
-:doc:`/how-to/write-custom-compositors`.
+:doc:`/how-to/write-custom-composites`.
 
 
 .. _use-canonizers:
