@@ -22,7 +22,11 @@ from .core import Hook, BasicHook, stabilize, expand
 
 
 class Epsilon(BasicHook):
-    '''Epsilon LRP rule.
+    '''LRP Epsilon rule :cite:p:`bach2015pixel`.
+    Setting ``(epsilon=0)`` produces the LRP-0 rule :cite:p:`bach2015pixel`.
+    LRP Epsilon is most commonly used in middle layers, LRP-0 is most commonly used in upper layers
+    :cite:p:`montavon2019layer`.
+    Sometimes higher values of ``epsilon`` are used, therefore it is not always only a stabilizer value.
 
     Parameters
     ----------
@@ -40,7 +44,7 @@ class Epsilon(BasicHook):
 
 
 class Gamma(BasicHook):
-    '''Gamma LRP rule.
+    '''LRP Gamma rule :cite:p:`montavon2019layer`.
 
     Parameters
     ----------
@@ -58,15 +62,15 @@ class Gamma(BasicHook):
 
 
 class ZPlus(BasicHook):
-    '''ZPlus (or alpha=1, beta=0) LRP rule.
+    '''LRP ZPlus rule :cite:p:`bach2015pixel,montavon2017explaining`.
+    It is the same as using :py:class:`~zennit.rules.AlphaBeta` with ``(alpha=1, beta=0)``
 
     Notes
     -----
     Note that the original deep Taylor Decomposition (DTD) specification of the ZPlus Rule
-    (https://doi.org/10.1016/j.patcog.2016.11.008) only considers positive inputs, as they are used in ReLU Networks.
+    :cite:p:`montavon2017explaining` only considers positive inputs, as they are used in ReLU Networks.
     This implementation is effectively alpha=1, beta=0, where negative inputs are allowed.
     '''
-
     def __init__(self):
         super().__init__(
             input_modifiers=[
@@ -84,7 +88,10 @@ class ZPlus(BasicHook):
 
 
 class AlphaBeta(BasicHook):
-    '''AlphaBeta LRP rule.
+    '''LRP AlphaBeta rule :cite:p:`bach2015pixel`.
+    The AlphaBeta rule weights positive (alpha) and negative (beta) contributions.
+    Most common parameters are ``(alpha=1, beta=0)`` and ``(alpha=2, beta=1)``.
+    It is most commonly used for lower layers :cite:p:`montavon2019layer`.
 
     Parameters
     ----------
@@ -129,14 +136,21 @@ class AlphaBeta(BasicHook):
 
 
 class ZBox(BasicHook):
-    '''ZBox LRP rule for input pixel space.
+    '''LRP ZBox rule :cite:p:`montavon2017explaining`.
+    The ZBox rule is intended for "boxed" input pixel space.
+    Generally, the lowest and highest *possible* values are used, i.e. ``(low=0., high=1.)`` for raw image data in
+    the float data type.
+    Neural network inputs are often normalized to match an isotropic gaussian distribution with mean 0 and variance 1,
+    which means that the lowest and highest values also need to be adapted.
+    For image data, this generally happens per channel, for which case ``low`` and ``high`` can be passed as tensors
+    with shape ``(1, 3, 1, 1)``, which will be broadcasted as expected.
 
     Parameters
     ----------
-    low: obj:`torch.Tensor`
-        Lowest pixel values of input.
-    high: obj:`torch.Tensor`
-        Highest pixel values of input.
+    low: :py:class:`torch.Tensor` or float
+        Lowest pixel values of input. Subject to broadcasting.
+    high: :py:class:`torch.Tensor` or float
+        Highest pixel values of input. Subject to broadcasting.
     '''
     def __init__(self, low, high):
         def sub(positive, *negatives):
@@ -160,8 +174,9 @@ class ZBox(BasicHook):
 
 
 class Pass(Hook):
-    '''If the rule of a layer shall not be any other, is elementwise and shall not be the gradient, the `Pass` rule
-    simply passes upper layer relevance through to the lower layer.
+    '''Unmodified pass-through rule.
+    If the rule of a layer shall not be any other, is elementwise and shall not be the gradient, the `Pass` rule simply
+    passes upper layer relevance through to the lower layer.
     '''
     def backward(self, module, grad_input, grad_output):
         '''Pass through the upper gradient, skipping the one for this layer.'''
@@ -169,9 +184,10 @@ class Pass(Hook):
 
 
 class Norm(BasicHook):
-    '''Normalize and weigh relevance by input contribution.
-    This is essentially the same as the LRP Epsilon Rule with a fixed epsilon only used as a stabilizer, and without
-    the need of the attached layer to have parameters `weight` and `bias`.
+    '''Normalize and weight by input contribution.
+    This is essentially the same as the LRP :py:class:`~zennit.rules.Epsilon` rule :cite:p:`bach2015pixel` with a fixed
+    epsilon only used as a stabilizer, and without the need of the attached layer to have parameters ``weight`` and
+    ``bias``.
     '''
     def __init__(self):
         super().__init__(
@@ -185,7 +201,9 @@ class Norm(BasicHook):
 
 
 class WSquare(BasicHook):
-    '''This is the WSquare LRP rule.'''
+    '''LRP WSquare rule :cite:p:`montavon2017explaining`.
+    It is most commonly used in the first layer when the values are not bounded :cite:p:`montavon2019layer`.
+    '''
     def __init__(self):
         super().__init__(
             input_modifiers=[torch.ones_like],
@@ -197,7 +215,8 @@ class WSquare(BasicHook):
 
 
 class Flat(BasicHook):
-    '''This is the Flat LRP rule. It is essentially the same as the WSquare Rule, but with all parameters set to ones.
+    '''LRP Flat rule :cite:p:`lapuschkin2019unmasking`.
+    It is essentially the same as the LRP :py:class:`~zennit.rules.WSquare` rule, but with all parameters set to ones.
     '''
     def __init__(self):
         super().__init__(
@@ -213,14 +232,14 @@ class Flat(BasicHook):
 
 
 class ReLUDeconvNet(Hook):
-    '''Hook to modify ReLU gradient according to DeconvNet.'''
+    '''DeconvNet ReLU rule :cite:p:`zeiler2014visualizing`.'''
     def backward(self, module, grad_input, grad_output):
-        '''Modify ReLU gradient according to DeconvNet.'''
+        '''Modify ReLU gradient according to DeconvNet :cite:p:`zeiler2014visualizing`.'''
         return (grad_output[0].clamp(min=0),)
 
 
 class ReLUGuidedBackprop(Hook):
-    '''Hook to modify ReLU gradient according to GuidedBackprop.'''
+    '''GuidedBackprop ReLU rule :cite:p:`springenberg2015striving`.'''
     def backward(self, module, grad_input, grad_output):
-        '''Modify ReLU gradient according to GuidedBackprop.'''
+        '''Modify ReLU gradient according to GuidedBackprop :cite:p:`springenberg2015striving`.'''
         return (grad_input[0] * (grad_output[0] > 0.),)

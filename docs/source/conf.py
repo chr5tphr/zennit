@@ -19,6 +19,10 @@ from subprocess import run, CalledProcessError
 import inspect
 import pkg_resources
 
+from pybtex.style.formatting.plain import Style as PlainStyle
+from pybtex.style.labels import BaseLabelStyle
+from pybtex.plugin import register_plugin
+
 
 # -- Project information -----------------------------------------------------
 project = 'zennit'
@@ -41,6 +45,7 @@ extensions = [
     'sphinx_rtd_theme',
     'sphinx_copybutton',
     'sphinxcontrib.datatemplates',
+    'sphinxcontrib.bibtex',
 ]
 
 
@@ -82,6 +87,23 @@ html_favicon = '_static/favicon.svg'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+bibtex_bibfiles = ['bibliography.bib']
+bibtex_default_style = 'author_year_style'
+bibtex_reference_style = 'author_year'
+
+
+class AuthorYearLabelStyle(BaseLabelStyle):
+    def format_labels(self, sorted_entries):
+        for entry in sorted_entries:
+            yield f'[{entry.persons["author"][0].last_names[0]} et al., {entry.fields["year"]}]'
+
+
+class AuthorYearStyle(PlainStyle):
+    default_label_style = AuthorYearLabelStyle
+
+
+register_plugin('pybtex.style.formatting', 'author_year_style', AuthorYearStyle)
 
 
 def getrev():
