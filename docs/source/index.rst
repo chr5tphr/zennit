@@ -22,6 +22,7 @@ Contents
     how-to/index
     tutorial/index
     reference/index
+    bibliography
 
 Indices and tables
 ------------------
@@ -34,7 +35,7 @@ Indices and tables
 Citing
 ------
 
-If you find Zennit useful, why not cite our related paper:
+If you find Zennit useful, why not cite our related paper :cite:p:`anders2021software`:
 
 .. code-block:: bibtex
 

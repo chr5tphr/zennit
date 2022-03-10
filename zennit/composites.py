@@ -234,12 +234,8 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
 
 @register_composite('deconvnet')
 class DeconvNet(LayerMapComposite):
-    '''An explicit composite modifying the gradients of all ReLUs according to DeconvNet [1]_.
-
-    References
-    ----------
-    .. [1] M. D. Zeiler and R. Fergus, “Visualizing and understanding convolutional networks,” in European conference
-           on computer vision. Springer, 2014, pp. 818–833.
+    '''An explicit composite modifying the gradients of all ReLUs according to DeconvNet
+    :cite:p:`zeiler2014visualizing`.
     '''
     def __init__(self, canonizers=None):
         layer_map = [
@@ -250,12 +246,8 @@ class DeconvNet(LayerMapComposite):
 
 @register_composite('guided_backprop')
 class GuidedBackprop(LayerMapComposite):
-    '''An explicit composite modifying the gradients of all ReLUs according to GuidedBackprop [2]_.
-
-    References
-    ----------
-    .. [2] J. T. Springenberg, A. Dosovitskiy, T. Brox, and M. A. Riedmiller, “Striving for simplicity: The all
-           convolutional net,” in Proceedings of the International Conference of Learning Representations (ICLR), 2015.
+    '''An explicit composite modifying the gradients of all ReLUs according to GuidedBackprop
+    :cite:p:`springenberg2015striving`.
     '''
     def __init__(self, canonizers=None):
         layer_map = [
@@ -266,14 +258,7 @@ class GuidedBackprop(LayerMapComposite):
 
 @register_composite('excitation_backprop')
 class ExcitationBackprop(LayerMapComposite):
-    '''An explicit composite implementing the ExcitationBackprop [3]_.
-
-    References
-    ----------
-    .. [3] J. Zhang, S. A. Bargal, Z. Lin, J. Brandt, X. Shen, and S. Sclaroff, “Top-down neural attention by
-           excitation backprop,” International Journal of Computer Vision, vol. 126, no. 10, pp. 1084–1102, 2018.
-
-    '''
+    '''An explicit composite implementing the ExcitationBackprop :cite:p:`zhang2016top`.'''
     def __init__(self, canonizers=None):
         layer_map = [
             (Sum, Norm()),
