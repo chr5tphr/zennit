@@ -392,9 +392,9 @@ class CompositeContext:
 
     Parameters
     ----------
-    module: obj:`torch.nn.Module`
+    module: :py:class:`torch.nn.Module`
         The module to which `composite` should be registered.
-    composite: obj:`Composite`
+    composite: :py:class:`zennit.core.Composite`
         The composite which shall be registered to `module`.
     '''
     def __init__(self, module, composite):
@@ -416,13 +416,16 @@ class Composite:
 
     Parameters
     ----------
-    module_map: callable
-        A function `(ctx: dict, name: str, module: torch.nn.Module) -> Hook or None` which
-
-    canonizers: list[Canonizer]
+    module_map: callable, optional
+        A function ``(ctx: dict, name: str, module: torch.nn.Module) -> Hook or None`` which maps a context, name and
+        module to a matching :py:class:`~zennit.core.Hook`, or ``None`` if there is no matchin
+        :py:class:`~zennit.core.Hook`.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
     def __init__(self, module_map=None, canonizers=None):
+        if module_map is None:
+            module_map = self._empty_module_map
         if canonizers is None:
             canonizers = []
 
@@ -438,8 +441,9 @@ class Composite:
 
         Parameters
         ----------
-        module: obj:`torch.nn.Module`
-            Hooks and canonizers will be applied to this module recursively according to `module_map` and `canonizers`
+        module: :py:class:`torch.nn.Module`
+            Hooks and canonizers will be applied to this module recursively according to ``module_map`` and
+            ``canonizers``.
         '''
         self.handles.remove()
 
@@ -465,7 +469,17 @@ class Composite:
 
         Parameters
         ----------
-        module: obj:`torch.nn.module`
+        module: :py:class:`torch.nn.Module`
             Module for which to register this composite in the context.
+
+        Returns
+        -------
+        :py:class:`zennit.core.CompositeContext`
+            A context object which registers the composite to ``module`` on entering, and removes it on exiting.
         '''
         return CompositeContext(module, self)
+
+    @staticmethod
+    def _empty_module_map(ctx, name, module):
+        '''Empty module_map, does not assign any rules.'''
+        return None
