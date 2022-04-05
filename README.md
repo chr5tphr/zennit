@@ -53,11 +53,11 @@ $ pip install ./zennit
 At its heart, Zennit registers hooks at Pytorch's Module level, to modify the
 backward pass to produce rule-based attributions like LRP (instead of the usual
 gradient). All rules are implemented as hooks
-([`zennit/rules.py`](zennit/rules.py)) and most use the LRP basis
-`BasicHook` ([`zennit/core.py`](zennit/core.py)).
+([`zennit/rules.py`](src/zennit/rules.py)) and most use the LRP basis
+`BasicHook` ([`zennit/core.py`](src/zennit/core.py)).
 
-**Composites** ([`zennit/composites.py`](zennit/composites.py)) are a way of
-choosing the right hook for the right layer. In addition to the abstract
+**Composites** ([`zennit/composites.py`](src/zennit/composites.py)) are a way
+of choosing the right hook for the right layer. In addition to the abstract
 **NameMapComposite**, which assigns hooks to layers by name, and
 **LayerMapComposite**, which assigns hooks to layers based on their Type, there
 exist explicit **Composites**, some of which are `EpsilonGammaBox` (`ZBox` in
@@ -66,14 +66,14 @@ in dense, `ZPlus` in convolutions). All composites may be used by directly
 importing from `zennit.composites`, or by using their snake-case name as key
 for `zennit.composites.COMPOSITES`.
 
-**Canonizers** ([`zennit/canonizers.py`](zennit/canonizers.py)) temporarily
+**Canonizers** ([`zennit/canonizers.py`](src/zennit/canonizers.py)) temporarily
 transform models into a canonical form, if required, like
 `SequentialMergeBatchNorm`, which automatically detects and merges BatchNorm
 layers followed by linear layers in sequential networks, or
 `AttributeCanonizer`, which temporarily overwrites attributes of applicable
 modules, e.g. to handle the residual connection in ResNet-Bottleneck modules.
 
-**Attributors** ([`zennit/attribution.py`](zennit/attribution.py)) directly
+**Attributors** ([`zennit/attribution.py`](src/zennit/attribution.py)) directly
 execute the necessary steps to apply certain attribution methods, like the
 simple `Gradient`, `SmoothGrad` or `Occlusion`. An optional **Composite** may
 be passed, which will be applied during the **Attributor**'s execution to

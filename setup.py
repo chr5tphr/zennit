@@ -48,7 +48,8 @@ setup(
     long_description=get_long_description('chr5tphr/zennit'),
     long_description_content_type='text/markdown',
     url='https://github.com/chr5tphr/zennit',
-    packages=find_packages(include=['zennit*']),
+    packages=find_packages(where='src', include=['zennit*']),
+    package_dir={'': 'src'},
     install_requires=[
         'click',
         'numpy',
@@ -59,6 +60,18 @@ setup(
     setup_requires=[
         'setuptools_scm',
     ],
+    extras_require={
+        'docs': [
+            'sphinx-copybutton>=0.4.0',
+            'sphinx-rtd-theme>=1.0.0',
+            'sphinxcontrib.datatemplates>=0.9.0',
+            'sphinxcontrib.bibtex>=2.4.1',
+        ],
+        'tests': [
+            'pytest',
+            'pytest-cov',
+        ]
+    },
     python_requires='>=3.7',
     classifiers=[
         'Development Status :: 3 - Alpha',

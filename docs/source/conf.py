@@ -131,7 +131,7 @@ extlinks = {
 
 LINKCODE_URL = (
     f'https://github.com/chr5tphr/zennit/blob/{REVISION}'
-    '/{filepath}#L{linestart}-L{linestop}'
+    '/src/{filepath}#L{linestart}-L{linestop}'
 )
 
 
