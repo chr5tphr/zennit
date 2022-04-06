@@ -7,6 +7,11 @@ from torch.nn import Conv1d, ConvTranspose1d, Linear
 from torch.nn import Conv2d, ConvTranspose2d
 from torch.nn import Conv3d, ConvTranspose3d
 from torch.nn import BatchNorm1d, BatchNorm2d, BatchNorm3d
+from torchvision.models import vgg11, resnet18, alexnet
+
+from zennit.core import Composite
+from zennit.composites import COMPOSITES, NameMapComposite, LayerMapComposite, SpecialFirstLayerMapComposite
+from zennit.composites import EpsilonGammaBox
 
 
 def pytest_addoption(parser):
@@ -146,3 +151,50 @@ def data_simple(request, rng, batchsize):
     '''Fixture to create data for a linear module, given an RNG.'''
     shape = (batchsize,) + request.param
     return torch.empty(*shape, dtype=torch.float64).normal_(generator=rng)
+
+
+COMPOSITE_KWARGS = {
+    EpsilonGammaBox: {'low': -3., 'high': 3.},
+}
+
+
+@pytest.fixture(scope='session', params=[
+    elem for elem in COMPOSITES.values()
+    if issubclass(elem, LayerMapComposite) and not issubclass(elem, SpecialFirstLayerMapComposite)
+])
+def layer_map_composite(request):
+    '''Fixture for explicit LayerMapComposites.'''
+    return request.param(**COMPOSITE_KWARGS.get(request.param, {}))
+
+
+@pytest.fixture(scope='session', params=[
+    elem for elem in COMPOSITES.values() if issubclass(elem, SpecialFirstLayerMapComposite)
+])
+def special_first_layer_map_composite(request):
+    '''Fixturer for explicit SpecialFirstLayerMapComposites.'''
+    return request.param(**COMPOSITE_KWARGS.get(request.param, {}))
+
+
+@pytest.fixture(scope='session', params=[Composite, *COMPOSITES.values()])
+def any_composite(request):
+    '''Fixture for all explicitly registered Composites, as well as the empty Composite.'''
+    return request.param(**COMPOSITE_KWARGS.get(request.param, {}))
+
+
+@pytest.fixture(scope='session')
+def name_map_composite(request, model_vision, layer_map_composite):
+    '''Fixture to create NameMapComposites based on explicit LayerMapComposites.'''
+    rule_map = {}
+    for name, child in model_vision.named_modules():
+        for dtype, hook_template in layer_map_composite.layer_map:
+            if isinstance(child, dtype):
+                rule_map.setdefault(hook_template, []).append(name)
+                break
+    name_map = [(tuple(value), key) for key, value in rule_map.items()]
+    return NameMapComposite(name_map=name_map)
+
+
+@pytest.fixture(scope='session', params=[alexnet, vgg11, resnet18])
+def model_vision(request):
+    '''Models to test composites on.'''
+    return request.param()
