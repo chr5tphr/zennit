@@ -1,6 +1,8 @@
 '''Configuration and fixtures for testing'''
 from itertools import product
+from collections import OrderedDict
 
+import numpy as np
 import pytest
 import torch
 from torch.nn import Conv1d, ConvTranspose1d, Linear
@@ -9,6 +11,7 @@ from torch.nn import Conv3d, ConvTranspose3d
 from torch.nn import BatchNorm1d, BatchNorm2d, BatchNorm3d
 from torchvision.models import vgg11, resnet18, alexnet
 
+from zennit.attribution import identity
 from zennit.core import Composite
 from zennit.composites import COMPOSITES, NameMapComposite, LayerMapComposite, SpecialFirstLayerMapComposite
 from zennit.composites import EpsilonGammaBox
@@ -32,6 +35,13 @@ def pytest_generate_tests(metafunc):
 def prodict(**kwargs):
     '''Create a dictionary with values which are the cartesian product of the input keyword arguments.'''
     return [dict(zip(kwargs, val)) for val in product(*kwargs.values())]
+
+
+def one_hot_max(output):
+    '''Get the one-hot encoded max.'''
+    return torch.sparse_coo_tensor(
+        [*zip(np.unravel_index(output.argmax(), output.shape))], [1.], output.shape, dtype=output.dtype
+    ).to_dense()
 
 
 @pytest.fixture(
@@ -198,3 +208,43 @@ def name_map_composite(request, model_vision, layer_map_composite):
 def model_vision(request):
     '''Models to test composites on.'''
     return request.param()
+
+
+@pytest.fixture(scope='session')
+def model_simple(rng, module_linear, data_linear):
+    '''Fixture for a simple model, using a linear module followed by a ReLU and a dense layer.'''
+    with torch.no_grad():
+        intermediate = module_linear(data_linear)
+    return torch.nn.Sequential(OrderedDict([
+        ('linr0', module_linear),
+        ('actv0', torch.nn.ReLU()),
+        ('flat0', torch.nn.Flatten()),
+        ('linr1', torch.nn.Linear(intermediate.shape[1:].numel(), 4, dtype=intermediate.dtype)),
+    ]))
+
+
+@pytest.fixture(scope='session')
+def model_simple_grad(data_linear, model_simple):
+    '''Fixture for gradient wrt. data_linear for model_simple.'''
+    data = data_linear.detach().requires_grad_()
+    output = model_simple(data)
+    grad, = torch.autograd.grad(output, data, output)
+    return grad
+
+
+@pytest.fixture(scope='session')
+def model_simple_output(data_linear, model_simple):
+    '''Fixture for output given data_linear for model_simple.'''
+    data = data_linear.detach()
+    output = model_simple(data)
+    return output
+
+
+@pytest.fixture(scope='session', params=[
+    identity,
+    one_hot_max,
+    torch.ones_like,
+])
+def grad_outputs_func(request):
+    '''Fixture for common attr_output_fn functions.'''
+    return request.param
