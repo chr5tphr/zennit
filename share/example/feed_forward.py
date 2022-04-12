@@ -1,5 +1,6 @@
 '''A quick example to generate heatmaps for vgg16.'''
 import os
+from functools import partial
 
 import click
 import torch
@@ -141,6 +142,11 @@ def main(
     # convenience identity matrix to produce one-hot encodings
     eye = torch.eye(n_outputs, device=device)
 
+    # function to compute output relevance given the function output and a target
+    def attr_output_fn(output, target):
+        # output times one-hot encoding of the target labels of size (len(target), 1000)
+        return output * eye[target]
+
     # create a composite if composite_name was set, otherwise we do not use a composite
     composite = None
     if composite_name is not None:
@@ -185,10 +191,11 @@ def main(
             # the model input
             data_norm = norm_fn(data.to(device))
 
-            # one-hot encoding of the target labels of size (len(target), 1000)
-            output_relevance = eye[target]
+            # create output relevance function of output with fixed target
+            output_relevance = partial(attr_output_fn, target=target)
 
-            # this will compute the modified gradient of model, with the on
+            # this will compute the modified gradient of model, where the output relevance is chosen by the as the
+            # model's output for the ground-truth label index
             output, relevance = attributor(data_norm, output_relevance)
 
             # sum over the color channel for visualization

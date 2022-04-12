@@ -469,7 +469,7 @@ class Occlusion(Attributor):
             occluded_input = self.occlusion_fn(input, mask)
             with torch.no_grad():
                 output = self.model(occluded_input)
-            score = (attr_output_fn(output) * output).sum(tuple(range(1, output.ndim)))
+            score = attr_output_fn(output).sum(tuple(range(1, output.ndim)))
             result += mask * score[(slice(None),) + (None,) * (input.ndim - 1)]
 
         output = self.model(input)
