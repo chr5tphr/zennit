@@ -138,9 +138,9 @@ window:
         )
     )
     with attributor:
-        # for occlusion, the tracked score is the vector product of the
-        # provided *grad_output* and the model's output
-        output, relevance = attributor(input, torch.eye(10)[[0]])
+        # for occlusion, the score for each window-pass is the sum of the
+        # provided *grad_output*, which we choose as the model output at index 0
+        output, relevance = attributor(input, lambda out: torch.eye(10)[[0]] * out)
 
 
 Note that while the interface allows to pass a composite for any
