@@ -409,7 +409,7 @@ class Occlusion(Attributor):
     '''
     def __init__(self, model, composite=None, attr_output=None, occlusion_fn=None, window=8, stride=8):
         def typecheck(obj):
-            return isinstance(window, int) or isinstance(window, tuple) and all(isinstance(elem, int) for elem in obj)
+            return isinstance(obj, int) or isinstance(obj, tuple) and all(isinstance(elem, int) for elem in obj)
 
         super().__init__(model=model, composite=composite, attr_output=attr_output)
 
