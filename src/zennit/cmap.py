@@ -202,10 +202,10 @@ class ColorMap:
         obj:`numpy.ndarray`
             The palette described by an unsigned 8-bit numpy array with 256 entries.
         '''
-        x = np.linspace(-1., 1., 256) * level
+        x = np.linspace(-1., 1., 256, dtype=np.float64) * level
         x = ((x + 1.) / 2.).clip(0., 1.)
         x = self(x)
-        x = (x * 255.).clip(0., 255.).astype(np.uint8)
+        x = (x * 255.).round(12).clip(0., 255.).astype(np.uint8)
         return x
 
 
