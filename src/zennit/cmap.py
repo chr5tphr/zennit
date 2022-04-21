@@ -85,6 +85,8 @@ class ColorMap:
         except RuntimeError as err:
             raise RuntimeError('Compilation of ColorMap failed!') from err
 
+        self._source = value
+
     @staticmethod
     def _lex(string):
         '''Lexical scanning of cmsl using regular expressions.'''
@@ -111,13 +113,10 @@ class ColorMap:
                 else:
                     raise RuntimeError(f'Unexpected {token}')
 
-                if token.type == 'shortcolor':
-                    value = tuple(int(char * 2, base=16) for char in token.value)
-                elif token.type == 'longcolor':
-                    value = tuple(int(''.join(chars), base=16) for chars in zip(*[iter(token.value)] * 2))
-
-                log.append(token)
+                value_it = iter(token.value) if token.type == 'longcolor' else token.value
+                value = [int(''.join(chars), base=16) for chars in zip(*[value_it] * 2)]
                 nodes.append(ColorNode(index, np.array(value)))
+                log.append(token)
             elif token.type == 'sep' and log and log[-1].type in ('longcolor', 'shortcolor'):
                 log.clear()
             elif token.type != 'whitespace':
