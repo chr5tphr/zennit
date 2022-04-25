@@ -131,10 +131,7 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, symmetric=False, gr
     image: obj:`PIL.Image`
         The array visualized as a Pillow Image.
     '''
-    try:
-        array = np.array(obj)
-    except TypeError as err:
-        raise TypeError(f'Could not cast \'{obj}\' to numpy array.') from err
+    array = np.array(obj)
 
     if grid:
         if isinstance(grid, (list, tuple)) and len(grid) != 2:
@@ -225,10 +222,7 @@ def gridify(obj, shape=None, fill_value=None):
         An array with the 0-th dimension absorbed into the height and width dimensions (then 0 and 1).
         The color dimension will be the last dimension, even if it was the first dimension before.
     '''
-    try:
-        array = np.array(obj)
-    except TypeError as err:
-        raise TypeError(f'Could not cast \'{obj}\' to numpy array.') from err
+    array = np.array(obj)
     if array.ndim not in (3, 4):
         raise TypeError('For creating an image grid, the array has to have either 3 (greyscale) or 4 (rgb) axes!')
 
