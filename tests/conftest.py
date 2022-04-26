@@ -98,7 +98,7 @@ def module_linear(rng, request):
 
 
 @pytest.fixture(scope='session')
-def module_batchnorm(module_linear):
+def module_batchnorm(module_linear, rng):
     '''Fixture for BatchNorm-type modules, based on adjacent linear module.'''
     module_map = [
         ((Linear, Conv1d, ConvTranspose1d), BatchNorm1d),
@@ -126,7 +126,11 @@ def module_batchnorm(module_linear):
     if feature_index is None:
         raise RuntimeError('No feature index for linear layer found.')
 
-    return batchnorm_type(num_features=module_linear.weight.shape[feature_index]).to(torch.float64).eval()
+    batchnorm = batchnorm_type(num_features=module_linear.weight.shape[feature_index]).to(torch.float64).eval()
+    batchnorm.weight.data.uniform_(**{'from': 0.1, 'to': 2.0, 'generator': rng})
+    batchnorm.bias.data.normal_(generator=rng)
+    batchnorm.eps = 1e-30
+    return batchnorm
 
 
 @pytest.fixture(scope='session')
