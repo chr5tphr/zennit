@@ -3,38 +3,11 @@ import pytest
 import torch
 from torchvision.models import vgg11_bn, resnet18, resnet50
 from torchvision.models.resnet import BasicBlock as ResNetBasicBlock, Bottleneck as ResNetBottleneck
+from helpers import assert_identity_hook, randomize_bnorm, nograd
 
 from zennit.core import Composite, RemovableHandleList
 from zennit.torchvision import VGGCanonizer, ResNetCanonizer
 from zennit.types import BatchNorm
-
-
-def assert_identity_hook(equal=True, message=''):
-    '''Create an assertion hook which checks whether the module does or does not modify its input.'''
-    def assert_identity(module, input, output):
-        '''Assert whether the module does or does not modify its input.'''
-        assert equal == torch.allclose(input[0], output, rtol=1e-5), message
-    return assert_identity
-
-
-def randomize_bnorm(model):
-    '''Randomize all BatchNorm module parameters of a model.'''
-    for module in model.modules():
-        if isinstance(module, BatchNorm):
-            module.weight.data.uniform_(0.1, 2.0)
-            module.running_var.data.uniform_(0.1, 2.0)
-            module.bias.data.normal_()
-            module.running_mean.data.normal_()
-            # smaller eps to reduce error
-            module.eps = 1e-30
-    return model
-
-
-def nograd(model):
-    '''Unset grad requirement for all model parameters.'''
-    for param in model.parameters():
-        param.requires_grad = False
-    return model
 
 
 def test_vgg_canonizer(batchsize):
