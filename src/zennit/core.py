@@ -162,7 +162,7 @@ def collect_leaves(module):
         is_leaf = False
         for leaf in collect_leaves(child):
             yield leaf
-    if is_leaf:
+    if is_leaf:  # pragma: no branch
         yield module
 
 
