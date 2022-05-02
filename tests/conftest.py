@@ -2,7 +2,6 @@
 from itertools import product
 from collections import OrderedDict
 
-import numpy as np
 import pytest
 import torch
 from torch.nn import Conv1d, ConvTranspose1d, Linear
@@ -10,6 +9,7 @@ from torch.nn import Conv2d, ConvTranspose2d
 from torch.nn import Conv3d, ConvTranspose3d
 from torch.nn import BatchNorm1d, BatchNorm2d, BatchNorm3d
 from torchvision.models import vgg11, resnet18, alexnet
+from helpers import prodict, one_hot_max
 
 from zennit.attribution import identity
 from zennit.core import Composite
@@ -30,18 +30,6 @@ def pytest_generate_tests(metafunc):
     '''Generate test fixture values based on CLI options.'''
     if 'batchsize' in metafunc.fixturenames:
         metafunc.parametrize('batchsize', [metafunc.config.getoption('batchsize')], scope='session')
-
-
-def prodict(**kwargs):
-    '''Create a dictionary with values which are the cartesian product of the input keyword arguments.'''
-    return [dict(zip(kwargs, val)) for val in product(*kwargs.values())]
-
-
-def one_hot_max(output):
-    '''Get the one-hot encoded max.'''
-    return torch.sparse_coo_tensor(
-        [*zip(np.unravel_index(output.argmax(), output.shape))], [1.], output.shape, dtype=output.dtype
-    ).to_dense()
 
 
 @pytest.fixture(
