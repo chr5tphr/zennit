@@ -224,3 +224,13 @@ def test_linear_rule(module_linear, data_linear, rule_pair_linear):
 def test_simple_rule(module_simple, data_simple, rule_pair_simple):
     '''Test whether replicated and original implementations of rules for simple layers agree.'''
     compare_rule_pair(module_simple, data_simple, rule_pair_simple)
+
+
+def test_alpha_beta_invalid_values():
+    '''Test whether AlphaBeta raises ValueErrors for negative alpha/beta or when alpha - beta is not equal to 1.'''
+    with pytest.raises(ValueError):
+        AlphaBeta(alpha=-1.)
+    with pytest.raises(ValueError):
+        AlphaBeta(beta=-1.)
+    with pytest.raises(ValueError):
+        AlphaBeta(alpha=1., beta=1.)
