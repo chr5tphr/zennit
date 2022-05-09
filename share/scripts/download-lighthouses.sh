@@ -174,7 +174,7 @@ parse_params "$@"
 command -v curl >/dev/null || die "curl not available!" 1
 command -v file >/dev/null || die "file not available!" 1
 
-mkdir -p "${wnids[@]/#/"$output/"}"
+mkdir -p "${wnids[@]/#/$output/}"
 
 echo -n "Downloading: "
 n_loaded=0
