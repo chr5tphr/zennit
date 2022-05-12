@@ -5,6 +5,7 @@
 .. toctree::
     :maxdepth: 1
 
+    image-classification-vgg
 ..
     image-classification-with-vgg-and-resnet
     image-segmentation-with-unet

@@ -66,6 +66,8 @@ setup(
             'sphinx-rtd-theme>=1.0.0',
             'sphinxcontrib.datatemplates>=0.9.0',
             'sphinxcontrib.bibtex>=2.4.1',
+            'nbsphinx>=0.8.8',
+            'ipykernel>=6.13.0',
         ],
         'tests': [
             'pytest',
