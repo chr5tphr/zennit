@@ -46,6 +46,7 @@ extensions = [
     'sphinx_copybutton',
     'sphinxcontrib.datatemplates',
     'sphinxcontrib.bibtex',
+    'nbsphinx',
 ]
 
 
@@ -54,6 +55,7 @@ def config_inited_handler(app, config):
 
 
 def setup(app):
+    app.add_config_value('REVISION', 'master', 'env')
     app.add_config_value('generated_path', '_generated', 'env')
     app.connect('config-inited', config_inited_handler)
 
@@ -65,6 +67,30 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
+
+# interactive badges for binder and colab
+nbsphinx_prolog = r"""
+{% set docname = 'docs/source/' + env.doc2path(env.docname, base=False) %}
+
+.. raw:: html
+
+    <div class="admonition note">
+      This page was generated from
+      <a class="reference external" href="https://github.com/chr5tphr/zennit/blob/{{ env.config.REVISION }}/{{ docname|e }}">{{ docname|e }}</a>
+      <br />
+      Interactive online version:
+      <span style="white-space: nowrap;">
+        <a href="https://mybinder.org/v2/gh/chr5tphr/zennit/{{ env.config.REVISION|e }}?filepath={{ docname|e }}">
+            <img alt="launch binder" src="https://mybinder.org/badge_logo.svg" style="vertical-align:text-bottom">
+        </a>
+      </span>
+      <span style="white-space: nowrap;">
+        <a href="https://colab.research.google.com/github/chr5tphr/zennit/blob/{{ env.config.REVISION|e }}/{{ docname|e }}">
+            <img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom">
+        </a>
+      </span>
+    </div>
+"""
 
 # autosummary_generate = True
 
