@@ -76,8 +76,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: "3.9"
-      - name: Install texlive
-        run: sudo apt-get update -y && sudo apt-get install -y texlive texlive-latex-extra dvipng
+      - name: Install texlive and pandoc
+        run: sudo apt-get update -y && sudo apt-get install -y texlive texlive-latex-extra dvipng pandoc
       - name: Install tox
         run: python -m pip install tox
       - name: Setup test environment
