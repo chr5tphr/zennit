@@ -59,6 +59,7 @@ current module:
 
 .. code-block:: python
 
+    import torch
     from zennit.core import Hook
 
 
@@ -70,6 +71,14 @@ current module:
 
 
     ignore_hook = Ignore()
+
+    input = torch.randn(1, 4, requires_grad=True)
+    module = torch.nn.ReLU()
+
+    handles = ignore_hook.register(module)
+    output = module(input)
+    grad, = torch.autograd.grad(output, input, torch.ones_like(output))
+    handles.remove()
 
 This particular rule is already included as :py:class:`zennit.rules.Pass`, and,
 for the layer-wise relevance propagation (LRP)-based **Composites**, used for
@@ -92,21 +101,30 @@ pass:
 
 .. code-block:: python
 
+    import torch
     from zennit.core import Hook
 
 
     class GradTimesInput(Hook):
         '''Hook for layer-wise gradient times input.'''
-        def forward(self, input, output):
+        def forward(self, module, input, output):
             '''Remember the input for the backward pass.'''
             self.stored_tensors['input'] = input
 
         def backward(self, module, grad_input, grad_output):
             '''Modify the gradient by element-wise multiplying the input.'''
-            return self.stored_tensors['input'] * grad_input
+            return (self.stored_tensors['input'][0] * grad_input[0],)
 
 
     grad_times_input_hook = GradTimesInput()
+
+    input = torch.randn(1, 4, requires_grad=True)
+    module = torch.nn.Linear(4, 4)
+
+    handles = grad_times_input_hook.register(module)
+    output = module(input)
+    grad, = torch.autograd.grad(output, input, torch.ones_like(output))
+    handles.remove()
 
 The elements of ``stored_tensors`` will be removed once
 :py:meth:`~zennit.core.Hook.remove` is called, e.g. when the context of the
@@ -129,6 +147,7 @@ of the input is scaled by some parameter:
 
 .. code-block:: python
 
+    import torch
     from zennit.core import Hook
 
 
@@ -140,7 +159,7 @@ of the input is scaled by some parameter:
             super().__init__()
             self.scale = scale
 
-        def forward(self, input, output):
+        def forward(self, module, input, output):
             '''Remember the input for the backward pass.'''
             self.stored_tensors['input'] = input
 
@@ -148,10 +167,12 @@ of the input is scaled by some parameter:
             '''Modify the gradient by element-wise multiplication of the input,
             but with the negative part of the input scaled.
             '''
-            return grad_input * (
-                self.stored_tensors['input'].clip(min=0.0)
-                + self.stored_tensors['input'].clip(max=0.0) * self.scale
-            )
+            return (
+                grad_input[0] * (
+                    self.stored_tensors['input'][0].clip(min=0.0)
+                    + self.stored_tensors['input'][0].clip(max=0.0) * self.scale
+                )
+            ,)
 
         def copy(self):
             return self.__class__(scale=self.scale)
@@ -160,6 +181,14 @@ of the input is scaled by some parameter:
     scaled_negative_hook = GradTimesScaledNegativeInput(scale=0.23)
     hook_copy = scaled_negative_hook.copy()
     assert scaled_negative_hook.scale == hook_copy.scale
+
+    input = torch.randn(1, 4, requires_grad=True)
+    module = torch.nn.Linear(4, 4)
+
+    handles = scaled_negative_hook.register(module)
+    output = module(input)
+    grad, = torch.autograd.grad(output, input, torch.ones_like(output))
+    handles.remove()
 
 Here, ``self.__class__`` returns the direct class of ``self``, which is
 ``GradTimesScaledNegativeInput`` unless a subtype of our class was created, and
@@ -246,16 +275,25 @@ using
 
 .. code-block:: python
 
-   from zennit.core import BasicHook
+    import torch
+    from zennit.core import BasicHook
 
 
-   lrp_zero_hook = BasicHook(
-        input_modifiers=[lambda input: input],
-        param_modifiers=[lambda param, _: param],
-        output_modifiers=[lambda output: output],
-        gradient_mapper=(lambda out_grad, outputs: [out_grad / outputs[0]]),
-        reducer=(lambda inputs, gradients: inputs[0] * gradients[0]),
-   )
+    lrp_zero_hook = BasicHook(
+         input_modifiers=[lambda input: input],
+         param_modifiers=[lambda param, _: param],
+         output_modifiers=[lambda output: output],
+         gradient_mapper=(lambda out_grad, outputs: [out_grad / outputs[0]]),
+         reducer=(lambda inputs, gradients: inputs[0] * gradients[0]),
+    )
+
+    input = torch.randn(1, 4, requires_grad=True)
+    module = torch.nn.Linear(4, 4)
+
+    handles = lrp_zero_hook.register(module)
+    output = module(input)
+    grad, = torch.autograd.grad(output, input, torch.ones_like(output))
+    handles.remove()
 
 This creates a single, usable hook, which can be copied with
 :py:meth:`zennit.core.BasicHook.copy`. The number of modifiers here is only 1,
@@ -277,16 +315,26 @@ default epsilon-value which cannot be specified.
 
 .. code-block:: python
 
+    import torch
     from zennit.core import BasicHook
 
 
     epsilon_hook = BasicHook()
+
+    input = torch.randn(1, 4, requires_grad=True)
+    module = torch.nn.Linear(4, 4)
+
+    handles = epsilon_hook.register(module)
+    output = module(input)
+    grad, = torch.autograd.grad(output, input, torch.ones_like(output))
+    handles.remove()
 
 As another example, the :py:class:`~zennit.rules.ZPlus` -Rule for ReLU-networks
 with strictly positive inputs can be implemented as
 
 .. code-block:: python
 
+    import torch
     from zennit.core import BasicHook
 
 
@@ -309,6 +357,14 @@ with strictly positive inputs can be implemented as
 
 
     hook = ZPlusReLU(['weight'])
+
+    input = torch.randn(1, 4, requires_grad=True)
+    module = torch.nn.Linear(4, 4)
+
+    handles = hook.register(module)
+    output = module(input)
+    grad, = torch.autograd.grad(output, input, torch.ones_like(output))
+    handles.remove()
 
 Here, we first implemented the new rule hook as a class by inheriting from
 :py:class:`~zennit.core.BasicHook` and calling ``super().__init__()``.
