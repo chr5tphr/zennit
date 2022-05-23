@@ -460,7 +460,7 @@ class Occlusion(Attributor):
         '''
         window, stride = self._resolve_window_stride(input)
 
-        root_mask = torch.zeros(input.shape, dtype=bool)
+        root_mask = torch.zeros_like(input, dtype=bool)
         root_mask[tuple(slice(0, elem) for elem in window)] = True
 
         result = torch.zeros_like(input)
