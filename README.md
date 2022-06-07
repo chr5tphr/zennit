@@ -101,88 +101,18 @@ with Gradient(model=model, composite=composite) as attributor:
     out, relevance = attributor(data, torch.eye(1000)[[0]])
 ```
 
+A similar setup using [the example script](share/example/feed_forward.py)
+produces the following attribution heatmaps:
+![beacon heatmaps](share/img/beacon_vgg16_epsilon_gamma_box.png)
+
 For more details and examples, have a look at our
 [**documentation**](https://zennit.readthedocs.io/en/latest/).
 
-## Example
-This example demonstrates how the script at
-[`share/example/feed_forward.py`](share/example/feed_forward.py) can be used to
-generate attribution heatmaps for VGG16.
-It requires bash, cURL and (magic-)file.
-
-Create a virtual environment, install Zennit and download the example scripts:
-```shell
-$ mkdir zennit-example
-$ cd zennit-example
-$ python -m venv .venv
-$ .venv/bin/pip install zennit
-$ curl -o feed_forward.py \
-    'https://raw.githubusercontent.com/chr5tphr/zennit/master/share/example/feed_forward.py'
-$ curl -o download-lighthouses.sh \
-    'https://raw.githubusercontent.com/chr5tphr/zennit/master/share/scripts/download-lighthouses.sh'
-```
-
-Prepare the data needed for the example :
-```shell
-$ mkdir params data results
-$ bash download-lighthouses.sh --output data/lighthouses
-$ curl -o params/vgg16-397923af.pth 'https://download.pytorch.org/models/vgg16-397923af.pth'
-```
-This creates the needed directories and downloads the pre-trained VGG16 parameters and 8 images of light houses from Wikimedia Commons into the required label-directory structure for the Imagenet dataset in Pytorch.
-
-The `feed_forward.py` example may then be run using:
-```shell
-$ .venv/bin/python feed_forward.py \
-    data/lighthouses \
-    'results/vgg16_epsilon_gamma_box_{sample:02d}.png' \
-    --inputs 'results/vgg16_input_{sample:02d}.png' \
-    --parameters params/vgg16-397923af.pth \
-    --model vgg16 \
-    --composite epsilon_gamma_box \
-    --relevance-norm symmetric \
-    --cmap coldnhot
-```
-which computes the LRP heatmaps according to the `epsilon_gamma_box` rule and
-stores them in `results`, along with the respective input images. Other
-possible composites that can be passed to `--composites` are, e.g.,
-`epsilon_plus`, `epsilon_alpha2_beta1_flat`, `guided_backprop`,
-`excitation_backprop`.
-
-The resulting heatmaps may look like the following:
-![beacon heatmaps](share/img/beacon_vgg16_epsilon_gamma_box.png)
-
-Alternatively, heatmaps for SmoothGrad with absolute relevances may be computed
-by omitting `--composite` and supplying `--attributor`:
-```shell
-$ .venv/bin/python feed_forward.py \
-    data/lighthouses \
-    'results/vgg16_smoothgrad_{sample:02d}.png' \
-    --inputs 'results/vgg16_input_{sample:02d}.png' \
-    --parameters params/vgg16-397923af.pth \
-    --model vgg16 \
-    --attributor smoothgrad \
-    --relevance-norm absolute \
-    --cmap hot
-```
-For Integrated Gradients, `--attributor integrads` may be provided.
-
-Heatmaps for Occlusion Analysis with unaligned relevances may be computed by
-executing:
-```shell
-$ .venv/bin/python feed_forward.py \
-    data/lighthouses \
-    'results/vgg16_occlusion_{sample:02d}.png' \
-    --inputs 'results/vgg16_input_{sample:02d}.png' \
-    --parameters params/vgg16-397923af.pth \
-    --model vgg16 \
-    --attributor occlusion \
-    --relevance-norm unaligned \
-    --cmap hot
-```
-
-## Example Heatmaps
-Heatmaps of various attribution methods for VGG16 and ResNet50, all generated using
-[`share/example/feed_forward.py`](share/example/feed_forward.py), can be found below.
+### More Example Heatmaps
+More heatmaps of various attribution methods for VGG16 and ResNet50, all
+generated using
+[`share/example/feed_forward.py`](share/example/feed_forward.py), can be found
+below.
 
 <details>
   <summary>Heatmaps for VGG16</summary>
@@ -197,21 +127,9 @@ Heatmaps of various attribution methods for VGG16 and ResNet50, all generated us
 </details>
 
 ## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on how to contribute.
 
-### Code Style
-We use [PEP8](https://www.python.org/dev/peps/pep-0008) with a line-width of 120 characters. For
-docstrings we use [numpydoc](https://numpydoc.readthedocs.io/en/latest/format.html).
-
-We use [`flake8`](https://pypi.org/project/flake8/) for quick style checks and
-[`pylint`](https://pypi.org/project/pylint/) for thorough style checks.
-
-### Testing
-Tests are written using [Pytest](https://docs.pytest.org) and executed
-in a separate environment using [Tox](https://tox.readthedocs.io/en/latest/).
-
-A full style check and all tests can be run by simply calling `tox` in the repository root.
-
-### Documentation
-The documentation is written using [Sphinx](https://www.sphinx-doc.org). It can be built at
-`docs/build` using the respective Tox environment with `tox -e docs`. To rebuild the full
-documentation, `tox -e docs -- -aE` can be used.
+## License
+Zennit is licensed under the GNU LESSER GENERAL PUBLIC LICENSE VERSION 3 OR
+LATER -- see the [LICENSE](LICENSE), [COPYING](COPYING) and
+[COPYING.LESSER](COPYING.LESSER) files for details.
