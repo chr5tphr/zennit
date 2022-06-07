@@ -86,6 +86,18 @@ class AvgPool(metaclass=SubclassMeta):
     )
 
 
+class MaxPool(metaclass=SubclassMeta):
+    '''Abstract base class that describes max-pooling modules.'''
+    __subclass__ = (
+        torch.nn.modules.pooling.MaxPool1d,
+        torch.nn.modules.pooling.MaxPool2d,
+        torch.nn.modules.pooling.MaxPool3d,
+        torch.nn.modules.pooling.AdaptiveMaxPool1d,
+        torch.nn.modules.pooling.AdaptiveMaxPool2d,
+        torch.nn.modules.pooling.AdaptiveMaxPool3d,
+    )
+
+
 class Activation(metaclass=SubclassMeta):
     '''Abstract base class that describes activation modules.'''
     __subclass__ = (
