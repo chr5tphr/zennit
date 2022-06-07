@@ -66,6 +66,9 @@ The following computes LRP relevance using the ``EpsilonPlusFlat`` composite:
     # create a composite instance
     composite = EpsilonPlusFlat()
 
+    # use the following instead to ignore bias for the relevance
+    # composite = EpsilonPlusFlat(zero_params='bias')
+
     # make sure the input requires a gradient
     input.requires_grad = True
 
@@ -122,7 +125,7 @@ may be combined with propagation-based (composite) approaches.
         # gradient/ relevance wrt. output/class 7
         output, relevance = attributor(input, torch.eye(10)[[7]])
 
-    print('SmoothGrad:', relevance)
+   print('SmoothGrad:', relevance)
 
 More information on attributors can be found in :doc:`/how-to/use-attributors`
 and :doc:`/how-to/write-custom-attributors`.
@@ -148,8 +151,7 @@ be simply supplied when instantiating a composite:
    # create the canonizers
    canonizers = [VGGCanonizer()]
    # EpsilonGammaBox needs keyword arguments 'low' and 'high'
-   high = torch.full_like(input, 4)
-   composite = EpsilonGammaBox(low=-high, high=high, canonizers=canonizers)
+   composite = EpsilonGammaBox(low=-3., high=3., canonizers=canonizers)
 
    with Gradient(model, composite) as attributor:
         # gradient/ relevance wrt. output/class 0
@@ -272,6 +274,7 @@ The ``feed_forward.py`` example can then be run using:
        --parameters params/vgg16-397923af.pth \
        --model vgg16 \
        --composite epsilon_gamma_box \
+       --no-bias \
        --relevance-norm symmetric \
        --cmap coldnhot
 
@@ -279,6 +282,7 @@ which computes the lrp heatmaps according to the ``epsilon_gamma_box`` rule and
 stores them in results, along with the respective input images. Other possible
 composites that can be passed to ``--composites`` are, e.g., ``epsilon_plus``,
 ``epsilon_alpha2_beta1_flat``, ``guided_backprop``, ``excitation_backprop``.
+The bias can be ignored in the LRP-computation by passing ``--no-bias``.
 
 
 ..
