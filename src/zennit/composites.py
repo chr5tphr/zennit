@@ -31,10 +31,12 @@ class LayerMapComposite(Composite):
     ----------
     layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
     def __init__(self, layer_map, canonizers=None):
         self.layer_map = layer_map
-        super().__init__(self.mapping, canonizers)
+        super().__init__(module_map=self.mapping, canonizers=canonizers)
 
     # pylint: disable=unused-argument
     def mapping(self, ctx, name, module):
@@ -66,10 +68,12 @@ class SpecialFirstLayerMapComposite(LayerMapComposite):
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook.
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         Applicable mapping for the first layer, same format as `layer_map`.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
     def __init__(self, layer_map, first_map, canonizers=None):
         self.first_map = first_map
-        super().__init__(layer_map, canonizers)
+        super().__init__(layer_map=layer_map, canonizers=canonizers)
 
     def mapping(self, ctx, name, module):
         '''Get the appropriate hook given a mapping from module types to hooks and a special mapping for the first
@@ -106,10 +110,12 @@ class NameMapComposite(Composite):
     ----------
     name_map: `list[tuple[tuple[str, ...], Hook]]`
         A mapping as a list of tuples, with a tuple of applicable module names and a Hook.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
     def __init__(self, name_map, canonizers=None):
         self.name_map = name_map
-        super().__init__(self.mapping, canonizers)
+        super().__init__(module_map=self.mapping, canonizers=canonizers)
 
     # pylint: disable=unused-argument
     def mapping(self, ctx, name, module):
@@ -166,17 +172,40 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
         Epsilon parameter for the epsilon rule.
     gamma: float
         Gamma parameter for the gamma rule.
+    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        Applicable mapping for the first layer, same format as `layer_map`. This will be prepended to the ``first_map``
+        defined by the composite.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, low, high, epsilon=1e-6, gamma=0.25, zero_params=None, canonizers=None):
+    def __init__(
+        self,
+        low,
+        high,
+        epsilon=1e-6,
+        gamma=0.25,
+        layer_map=None,
+        first_map=None,
+        zero_params=None,
+        canonizers=None
+    ):
+        if layer_map is None:
+            layer_map = []
+        if first_map is None:
+            first_map = []
+
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = LAYER_MAP_BASE + [
+        layer_map = layer_map + LAYER_MAP_BASE + [
             (Convolution, Gamma(gamma=gamma, **rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
-        first_map = [
+        first_map = first_map + [
             (Convolution, ZBox(low=low, high=high, **rule_kwargs))
         ]
-        super().__init__(layer_map, first_map, canonizers=canonizers)
+        super().__init__(layer_map=layer_map, first_map=first_map, canonizers=canonizers)
 
 
 @register_composite('epsilon_plus')
@@ -188,14 +217,22 @@ class EpsilonPlus(LayerMapComposite):
     ----------
     epsilon: float
         Epsilon parameter for the epsilon rule.
+    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, epsilon=1e-6, zero_params=None, canonizers=None):
+    def __init__(self, epsilon=1e-6, layer_map=None, zero_params=None, canonizers=None):
+        if layer_map is None:
+            layer_map = []
+
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = LAYER_MAP_BASE + [
+        layer_map = layer_map + LAYER_MAP_BASE + [
             (Convolution, ZPlus(**rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
-        super().__init__(layer_map, canonizers=canonizers)
+        super().__init__(layer_map=layer_map, canonizers=canonizers)
 
 
 @register_composite('epsilon_alpha2_beta1')
@@ -207,14 +244,22 @@ class EpsilonAlpha2Beta1(LayerMapComposite):
     ----------
     epsilon: float
         Epsilon parameter for the epsilon rule.
+    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, epsilon=1e-6, zero_params=None, canonizers=None):
+    def __init__(self, epsilon=1e-6, layer_map=None, zero_params=None, canonizers=None):
+        if layer_map is None:
+            layer_map = []
+
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = LAYER_MAP_BASE + [
+        layer_map = layer_map + LAYER_MAP_BASE + [
             (Convolution, AlphaBeta(alpha=2, beta=1, **rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
-        super().__init__(layer_map, canonizers=canonizers)
+        super().__init__(layer_map=layer_map, canonizers=canonizers)
 
 
 @register_composite('epsilon_plus_flat')
@@ -226,17 +271,30 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
     ----------
     epsilon: float
         Epsilon parameter for the epsilon rule.
+    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        Applicable mapping for the first layer, same format as `layer_map`. This will be prepended to the ``first_map``
+        defined by the composite.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, epsilon=1e-6, zero_params=None, canonizers=None):
+    def __init__(self, epsilon=1e-6, layer_map=None, first_map=None, zero_params=None, canonizers=None):
+        if layer_map is None:
+            layer_map = []
+        if first_map is None:
+            first_map = []
+
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = LAYER_MAP_BASE + [
+        layer_map = layer_map + LAYER_MAP_BASE + [
             (Convolution, ZPlus(**rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
-        first_map = [
+        first_map = first_map + [
             (Linear, Flat(**rule_kwargs))
         ]
-        super().__init__(layer_map, first_map, canonizers=canonizers)
+        super().__init__(layer_map=layer_map, first_map=first_map, canonizers=canonizers)
 
 
 @register_composite('epsilon_alpha2_beta1_flat')
@@ -248,26 +306,50 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
     ----------
     epsilon: float
         Epsilon parameter for the epsilon rule.
+    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        Applicable mapping for the first layer, same format as `layer_map`. This will be prepended to the ``first_map``
+        defined by the composite.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, epsilon=1e-6, zero_params=None, canonizers=None):
+    def __init__(self, epsilon=1e-6, layer_map=None, first_map=None, zero_params=None, canonizers=None):
+        if layer_map is None:
+            layer_map = []
+        if first_map is None:
+            first_map = []
+
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = LAYER_MAP_BASE + [
+        layer_map = layer_map + LAYER_MAP_BASE + [
             (Convolution, AlphaBeta(alpha=2, beta=1, **rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
-        first_map = [
+        first_map = first_map + [
             (Linear, Flat(**rule_kwargs))
         ]
-        super().__init__(layer_map, first_map, canonizers=canonizers)
+        super().__init__(layer_map=layer_map, first_map=first_map, canonizers=canonizers)
 
 
 @register_composite('deconvnet')
 class DeconvNet(LayerMapComposite):
     '''An explicit composite modifying the gradients of all ReLUs according to DeconvNet
     :cite:p:`zeiler2014visualizing`.
+
+    Parameters
+    ----------
+    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, canonizers=None):
-        layer_map = [
+    def __init__(self, layer_map=None, canonizers=None):
+        if layer_map is None:
+            layer_map = []
+
+        layer_map = layer_map + [
             (torch.nn.ReLU, ReLUDeconvNet()),
         ]
         super().__init__(layer_map, canonizers=canonizers)
@@ -277,22 +359,45 @@ class DeconvNet(LayerMapComposite):
 class GuidedBackprop(LayerMapComposite):
     '''An explicit composite modifying the gradients of all ReLUs according to GuidedBackprop
     :cite:p:`springenberg2015striving`.
+
+    Parameters
+    ----------
+    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, canonizers=None):
-        layer_map = [
+    def __init__(self, layer_map=None, canonizers=None):
+        if layer_map is None:
+            layer_map = []
+
+        layer_map = layer_map + [
             (torch.nn.ReLU, ReLUGuidedBackprop()),
         ]
-        super().__init__(layer_map, canonizers=canonizers)
+        super().__init__(layer_map=layer_map, canonizers=canonizers)
 
 
 @register_composite('excitation_backprop')
 class ExcitationBackprop(LayerMapComposite):
-    '''An explicit composite implementing the ExcitationBackprop :cite:p:`zhang2016top`.'''
-    def __init__(self, zero_params=None, canonizers=None):
+    '''An explicit composite implementing the ExcitationBackprop :cite:p:`zhang2016top`.
+
+    Parameters
+    ----------
+    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
+    '''
+    def __init__(self, layer_map=None, zero_params=None, canonizers=None):
+        if layer_map is None:
+            layer_map = []
+
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = [
+        layer_map = layer_map + [
             (Sum, Norm()),
             (AvgPool, Norm()),
             (Linear, ZPlus(**rule_kwargs)),
         ]
-        super().__init__(layer_map, canonizers=canonizers)
+        super().__init__(layer_map=layer_map, canonizers=canonizers)
