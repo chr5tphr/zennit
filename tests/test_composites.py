@@ -15,9 +15,7 @@ def ishookcopy(hook, hook_template):
                 'param_modifiers',
                 'output_modifiers',
                 'gradient_mapper',
-                'reducer',
-                'param_keys',
-                'require_params'
+                'param_kwargs',
             )
         )
     return isinstance(hook, type(hook_template))

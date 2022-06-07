@@ -72,6 +72,41 @@ Rules can be instantiated, after which they may be used directly:
     # remove the hooks
     handles.remove()
 
+All built-in **Rules** based on :py:class:`~zennit.core.BasicHook` can be instructed
+set parameters to zero by supplying a single string or a list of strings to the
+``zero_params`` keyword. This is mostly used to ignore the bias in linear
+layers:
+
+.. code-block:: python
+
+    import torch
+    from torch.nn import Linear
+    from zennit.rules import ZPlus
+
+    # instantiate the rule
+    rule = ZPlus(zero_params='bias')
+    dense_layer = Linear(3 * 32 * 32, 32 * 32)
+
+    # registering a rule adds hooks to the module which temporarily overwrites
+    # its gradient computation; handles are returned to remove the hooks to undo
+    # the modification
+    handles = rule.register(dense_layer)
+
+    # to compute the gradient (i.e. the attribution), requires_grad must be True
+    input = torch.randn(1, 3 * 32 * 32, requires_grad=True)
+    output = dense_layer(input)
+
+    # torch.autograd.grad returns a tuple, the comma after `attribution`
+    # unpacks the single element in the tuple; the `grad_outputs` are necessary
+    # for non-scalar outputs, and can be used to target which output should be
+    # attributed for; `ones_like` targets all outputs
+    attribution, = torch.autograd.grad(
+        output, input, grad_outputs=torch.ones_like(output)
+    )
+
+    # remove the hooks
+    handles.remove()
+
 See :doc:`/how-to/write-custom-rules` for further technical detail on how to
 write custom rules.
 
@@ -164,8 +199,32 @@ Composites may require arguments, e.g.
     # low and high values for ZBox need to be Tensors in the shape of the input
     # the batch-dimension may be chosen larger, to support different sizes
     composite = EpsilonGammaBox(
-        low=torch.full_like(input, -3 * sigma),
-        high=torch.full_like(input, 3 * sigma)
+        low=-3 * sigma,
+        high=3 * sigma,
+    )
+
+Some built-in rules also expose some of the parameters of their respective
+**Rules**, like the ``epsilon`` for :py:class:`~zennit.rules.Epsilon`, the
+``gamma`` for :py:class:`~zennit.rules.Gamma`, and ``zero_params`` for all
+**Rules** based on :py:class:`~zennit.core.BasicHook`, which can for example be
+used to ignore the bias in the layer-wise relevance computation:
+
+.. code-block:: python
+
+    import torch
+    from torch.nn import Sequential, Conv2d, ReLU, Linear, Flatten
+    from zennit.composites import EpsilonPlusFlat
+
+    # built-in Composites pass some parameters to the respective rules, which
+    # can be used for some simple modifications; zero_params is applied to all
+    # rules for which the module parameters are relevant, and can be used for
+    # example to set the bias to zero during the relevance computation
+    composite = EpsilonGammaBox(
+        low=-3.,
+        high=3.,
+        epsilon=1e-4,
+        gamma=2.,
+        zero_params='bias',
     )
 
 There are two basic ways using only the **Composite** to register the modules,

@@ -18,7 +18,10 @@
 '''Rules based on Hooks'''
 import torch
 
-from .core import Hook, BasicHook, stabilize, expand
+from .core import Hook, BasicHook, stabilize, expand, zero_wrap
+
+
+zero_bias = zero_wrap('bias')
 
 
 class Epsilon(BasicHook):
@@ -33,13 +36,14 @@ class Epsilon(BasicHook):
     epsilon: float, optional
         Stabilization parameter.
     '''
-    def __init__(self, epsilon=1e-6):
+    def __init__(self, epsilon=1e-6, zero_params=None):
         super().__init__(
             input_modifiers=[lambda input: input],
             param_modifiers=[lambda param, _: param],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0], epsilon)),
-            reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
+            reducer=(lambda inputs, gradients: inputs[0] * gradients[0]),
+            zero_params=zero_params,
         )
 
 
@@ -51,13 +55,14 @@ class Gamma(BasicHook):
     gamma: float, optional
         Multiplier for added positive weights.
     '''
-    def __init__(self, gamma=0.25):
+    def __init__(self, gamma=0.25, zero_params=None):
         super().__init__(
             input_modifiers=[lambda input: input],
             param_modifiers=[lambda param, _: param + gamma * param.clamp(min=0)],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
-            reducer=(lambda inputs, gradients: inputs[0] * gradients[0])
+            reducer=(lambda inputs, gradients: inputs[0] * gradients[0]),
+            zero_params=zero_params,
         )
 
 
@@ -71,7 +76,7 @@ class ZPlus(BasicHook):
     :cite:p:`montavon2017explaining` only considers positive inputs, as they are used in ReLU Networks.
     This implementation is effectively alpha=1, beta=0, where negative inputs are allowed.
     '''
-    def __init__(self):
+    def __init__(self, zero_params=None):
         super().__init__(
             input_modifiers=[
                 lambda input: input.clamp(min=0),
@@ -79,11 +84,12 @@ class ZPlus(BasicHook):
             ],
             param_modifiers=[
                 lambda param, _: param.clamp(min=0),
-                lambda param, name: param.clamp(max=0) if name != 'bias' else torch.zeros_like(param),
+                zero_bias(lambda param, name: param.clamp(max=0)),
             ],
             output_modifiers=[lambda output: output] * 2,
             gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(sum(outputs))] * 2),
-            reducer=(lambda inputs, gradients: inputs[0] * gradients[0] + inputs[1] * gradients[1])
+            reducer=(lambda inputs, gradients: inputs[0] * gradients[0] + inputs[1] * gradients[1]),
+            zero_params=zero_params,
         )
 
 
@@ -100,7 +106,7 @@ class AlphaBeta(BasicHook):
     beta: float, optional
         Multiplier for the negative output term.
     '''
-    def __init__(self, alpha=2., beta=1.):
+    def __init__(self, alpha=2., beta=1., zero_params=None):
         if alpha < 0 or beta < 0:
             raise ValueError("Both alpha and beta parameters must be positive!")
         if (alpha - beta) != 1.:
@@ -115,9 +121,9 @@ class AlphaBeta(BasicHook):
             ],
             param_modifiers=[
                 lambda param, _: param.clamp(min=0),
-                lambda param, name: param.clamp(max=0) if name != 'bias' else torch.zeros_like(param),
+                zero_bias(lambda param, name: param.clamp(max=0)),
                 lambda param, _: param.clamp(max=0),
-                lambda param, name: param.clamp(min=0) if name != 'bias' else torch.zeros_like(param),
+                zero_bias(lambda param, name: param.clamp(min=0)),
             ],
             output_modifiers=[lambda output: output] * 4,
             gradient_mapper=(
@@ -131,7 +137,8 @@ class AlphaBeta(BasicHook):
                     alpha * (inputs[0] * gradients[0] + inputs[1] * gradients[1])
                     - beta * (inputs[2] * gradients[2] + inputs[3] * gradients[3])
                 )
-            )
+            ),
+            zero_params=zero_params,
         )
 
 
@@ -152,7 +159,7 @@ class ZBox(BasicHook):
     high: :py:class:`torch.Tensor` or float
         Highest pixel values of input. Subject to broadcasting.
     '''
-    def __init__(self, low, high):
+    def __init__(self, low, high, zero_params=None):
         def sub(positive, *negatives):
             return positive - sum(negatives)
 
@@ -169,7 +176,8 @@ class ZBox(BasicHook):
             ],
             output_modifiers=[lambda output: output] * 3,
             gradient_mapper=(lambda out_grad, outputs: (out_grad / stabilize(sub(*outputs)),) * 3),
-            reducer=(lambda inputs, gradients: sub(*(input * gradient for input, gradient in zip(inputs, gradients))))
+            reducer=(lambda inputs, gradients: sub(*(input * gradient for input, gradient in zip(inputs, gradients)))),
+            zero_params=zero_params,
         )
 
 
@@ -204,13 +212,14 @@ class WSquare(BasicHook):
     '''LRP WSquare rule :cite:p:`montavon2017explaining`.
     It is most commonly used in the first layer when the values are not bounded :cite:p:`montavon2019layer`.
     '''
-    def __init__(self):
+    def __init__(self, zero_params=None):
         super().__init__(
             input_modifiers=[torch.ones_like],
             param_modifiers=[lambda param, _: param ** 2],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
-            reducer=(lambda inputs, gradients: gradients[0])
+            reducer=(lambda inputs, gradients: gradients[0]),
+            zero_params=zero_params,
         )
 
 
@@ -218,16 +227,17 @@ class Flat(BasicHook):
     '''LRP Flat rule :cite:p:`lapuschkin2019unmasking`.
     It is essentially the same as the LRP :py:class:`~zennit.rules.WSquare` rule, but with all parameters set to ones.
     '''
-    def __init__(self):
+    def __init__(self, zero_params=None):
         super().__init__(
             input_modifiers=[torch.ones_like],
             param_modifiers=[
-                lambda param, name: torch.ones_like(param) if name != 'bias' else torch.zeros_like(param)
+                zero_bias(lambda param, name: torch.ones_like(param))
             ],
             output_modifiers=[lambda output: output],
             gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
             reducer=(lambda inputs, gradients: gradients[0]),
-            require_params=False
+            require_params=False,
+            zero_params=zero_params,
         )
 
 

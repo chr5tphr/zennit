@@ -85,19 +85,34 @@ def with_grad(func):
     return wrapped
 
 
+def zero_bias(zero_params, bias):
+    '''Return a tensor with zeros like ``bias`` if zero_params is equal to or contains the string ``'bias'``, otherwise
+    return the unmodified tensor ``bias``.'''
+    if zero_params is None:
+        zero_params = []
+    if bias is not None and (zero_params == 'bias' or 'bias' in zero_params):
+        return torch.zeros_like(bias)
+    return bias
+
+
 @replicates(RULES_LINEAR, Epsilon, epsilon=1e-6)
+@replicates(RULES_LINEAR, Epsilon, epsilon=1e-6, zero_params='bias')
 @replicates(RULES_LINEAR, Epsilon, epsilon=1.0)
+@replicates(RULES_LINEAR, Epsilon, epsilon=1.0, zero_params='bias')
 @replicates(RULES_LINEAR, Norm)
 @matrix_form
-def rule_epsilon(weight, bias, input, relevance, epsilon=1e-6):
+def rule_epsilon(weight, bias, input, relevance, epsilon=1e-6, zero_params=None):
     '''Replicates the Epsilon rule.'''
+    bias = zero_bias(zero_params, bias)
     return input * ((relevance / stabilize(input @ weight.t() + bias, epsilon)) @ weight)
 
 
 @replicates(RULES_LINEAR, ZPlus)
+@replicates(RULES_LINEAR, ZPlus, zero_params='bias')
 @matrix_form
-def rule_zplus(weight, bias, input, relevance):
+def rule_zplus(weight, bias, input, relevance, zero_params=None):
     '''Replicates the ZPlus rule.'''
+    bias = zero_bias(zero_params, bias)
     wplus = weight.clamp(min=0)
     wminus = weight.clamp(max=0)
     xplus = input.clamp(min=0)
@@ -108,20 +123,26 @@ def rule_zplus(weight, bias, input, relevance):
 
 
 @replicates(RULES_LINEAR, Gamma, gamma=0.25)
+@replicates(RULES_LINEAR, Gamma, gamma=0.25, zero_params='bias')
 @replicates(RULES_LINEAR, Gamma, gamma=0.5)
+@replicates(RULES_LINEAR, Gamma, gamma=0.5, zero_params='bias')
 @matrix_form
-def rule_gamma(weight, bias, input, relevance, gamma):
+def rule_gamma(weight, bias, input, relevance, gamma, zero_params=None):
     '''Replicates the Gamma rule.'''
+    bias = zero_bias(zero_params, bias)
     wgamma = weight + weight.clamp(min=0) * gamma
     bgamma = bias + bias.clamp(min=0) * gamma
     return input * ((relevance / stabilize(input @ wgamma.t() + bgamma)) @ wgamma)
 
 
 @replicates(RULES_LINEAR, AlphaBeta, alpha=2.0, beta=1.0)
-@replicates(RULES_LINEAR, AlphaBeta, alpha=1.0, beta=0.0)
+@replicates(RULES_LINEAR, AlphaBeta, alpha=1.0, beta=0.0, zero_params='bias')
+@replicates(RULES_LINEAR, AlphaBeta, alpha=2.0, beta=1.0)
+@replicates(RULES_LINEAR, AlphaBeta, alpha=1.0, beta=0.0, zero_params='bias')
 @matrix_form
-def rule_alpha_beta(weight, bias, input, relevance, alpha, beta):
+def rule_alpha_beta(weight, bias, input, relevance, alpha, beta, zero_params=None):
     '''Replicates the AlphaBeta rule.'''
+    bias = zero_bias(zero_params, bias)
     wplus = weight.clamp(min=0)
     wminus = weight.clamp(max=0)
     xplus = input.clamp(min=0)
@@ -136,8 +157,9 @@ def rule_alpha_beta(weight, bias, input, relevance, alpha, beta):
 
 
 @replicates(RULES_LINEAR, ZBox, low=-3.0, high=3.0)
+@replicates(RULES_LINEAR, ZBox, low=-3.0, high=3.0, zero_params='bias')
 @matrix_form
-def rule_zbox(weight, bias, input, relevance, low, high):
+def rule_zbox(weight, bias, input, relevance, low, high, zero_params=None):
     '''Replicates the ZBox rule.'''
     wplus = weight.clamp(min=0)
     wminus = weight.clamp(max=0)
@@ -149,9 +171,11 @@ def rule_zbox(weight, bias, input, relevance, low, high):
 
 
 @replicates(RULES_LINEAR, WSquare)
+@replicates(RULES_LINEAR, WSquare, zero_params='bias')
 @matrix_form
-def rule_wsquare(weight, bias, input, relevance):
+def rule_wsquare(weight, bias, input, relevance, zero_params=None):
     '''Replicates the WSquare rule.'''
+    bias = zero_bias(zero_params, bias)
     wsquare = weight ** 2
     zval = torch.ones_like(input) @ wsquare.t() + bias ** 2
     rfac = relevance / stabilize(zval)

@@ -167,13 +167,14 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
     gamma: float
         Gamma parameter for the gamma rule.
     '''
-    def __init__(self, low, high, epsilon=1e-6, gamma=0.25, canonizers=None):
+    def __init__(self, low, high, epsilon=1e-6, gamma=0.25, zero_params=None, canonizers=None):
+        rule_kwargs = {'zero_params': zero_params}
         layer_map = LAYER_MAP_BASE + [
-            (Convolution, Gamma(gamma=gamma)),
-            (torch.nn.Linear, Epsilon(epsilon=epsilon)),
+            (Convolution, Gamma(gamma=gamma, **rule_kwargs)),
+            (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         first_map = [
-            (Convolution, ZBox(low, high))
+            (Convolution, ZBox(low=low, high=high, **rule_kwargs))
         ]
         super().__init__(layer_map, first_map, canonizers=canonizers)
 
@@ -188,10 +189,11 @@ class EpsilonPlus(LayerMapComposite):
     epsilon: float
         Epsilon parameter for the epsilon rule.
     '''
-    def __init__(self, epsilon=1e-6, canonizers=None):
+    def __init__(self, epsilon=1e-6, zero_params=None, canonizers=None):
+        rule_kwargs = {'zero_params': zero_params}
         layer_map = LAYER_MAP_BASE + [
-            (Convolution, ZPlus()),
-            (torch.nn.Linear, Epsilon(epsilon=epsilon)),
+            (Convolution, ZPlus(**rule_kwargs)),
+            (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         super().__init__(layer_map, canonizers=canonizers)
 
@@ -206,10 +208,11 @@ class EpsilonAlpha2Beta1(LayerMapComposite):
     epsilon: float
         Epsilon parameter for the epsilon rule.
     '''
-    def __init__(self, epsilon=1e-6, canonizers=None):
+    def __init__(self, epsilon=1e-6, zero_params=None, canonizers=None):
+        rule_kwargs = {'zero_params': zero_params}
         layer_map = LAYER_MAP_BASE + [
-            (Convolution, AlphaBeta(alpha=2, beta=1)),
-            (torch.nn.Linear, Epsilon(epsilon=epsilon)),
+            (Convolution, AlphaBeta(alpha=2, beta=1, **rule_kwargs)),
+            (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         super().__init__(layer_map, canonizers=canonizers)
 
@@ -224,13 +227,14 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
     epsilon: float
         Epsilon parameter for the epsilon rule.
     '''
-    def __init__(self, epsilon=1e-6, canonizers=None):
+    def __init__(self, epsilon=1e-6, zero_params=None, canonizers=None):
+        rule_kwargs = {'zero_params': zero_params}
         layer_map = LAYER_MAP_BASE + [
-            (Convolution, ZPlus()),
-            (torch.nn.Linear, Epsilon(epsilon=epsilon)),
+            (Convolution, ZPlus(**rule_kwargs)),
+            (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         first_map = [
-            (Linear, Flat())
+            (Linear, Flat(**rule_kwargs))
         ]
         super().__init__(layer_map, first_map, canonizers=canonizers)
 
@@ -245,13 +249,14 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
     epsilon: float
         Epsilon parameter for the epsilon rule.
     '''
-    def __init__(self, epsilon=1e-6, canonizers=None):
+    def __init__(self, epsilon=1e-6, zero_params=None, canonizers=None):
+        rule_kwargs = {'zero_params': zero_params}
         layer_map = LAYER_MAP_BASE + [
-            (Convolution, AlphaBeta(alpha=2, beta=1)),
-            (torch.nn.Linear, Epsilon(epsilon=epsilon)),
+            (Convolution, AlphaBeta(alpha=2, beta=1, **rule_kwargs)),
+            (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         first_map = [
-            (Linear, Flat())
+            (Linear, Flat(**rule_kwargs))
         ]
         super().__init__(layer_map, first_map, canonizers=canonizers)
 
@@ -283,10 +288,11 @@ class GuidedBackprop(LayerMapComposite):
 @register_composite('excitation_backprop')
 class ExcitationBackprop(LayerMapComposite):
     '''An explicit composite implementing the ExcitationBackprop :cite:p:`zhang2016top`.'''
-    def __init__(self, canonizers=None):
+    def __init__(self, zero_params=None, canonizers=None):
+        rule_kwargs = {'zero_params': zero_params}
         layer_map = [
             (Sum, Norm()),
             (AvgPool, Norm()),
-            (Linear, ZPlus()),
+            (Linear, ZPlus(**rule_kwargs)),
         ]
         super().__init__(layer_map, canonizers=canonizers)

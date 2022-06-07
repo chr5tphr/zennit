@@ -60,11 +60,16 @@ def test_expand_shape_invalid(input_shape, target_shape):
         expand(input, target_shape)
 
 
-@pytest.mark.parametrize('param_keys,require_params,bias', [
-    *product([None, ['weight'], ['bias'], ['weight', 'bias']], [True], [False, True]),
-    *product([['weight', 'bias', 'beight', 'wias']], [False], [False, True]),
+@pytest.mark.parametrize('param_keys,require_params,zero_params,bias', [
+    *product(
+        [None, ['weight'], ['bias'], ['weight', 'bias']],
+        [True],
+        [[], ['weight'], ['bias'], ['weight', 'bias']],
+        [False, True]
+    ),
+    *product([['weight', 'bias', 'beight', 'wias']], [False], [[]], [False, True]),
 ])
-def test_mod_params(param_keys, require_params, bias):
+def test_mod_params(param_keys, require_params, zero_params, bias):
     '''Test whether mod_params correctly changes and restores parameters of a module.'''
     module = nograd(torch.nn.Linear(2, 2, bias=bias))
     mod_param_keys = param_keys
@@ -73,18 +78,25 @@ def test_mod_params(param_keys, require_params, bias):
 
     for key in param_keys:
         if getattr(module, key, None) is not None:
-            getattr(module, key).data = torch.zeros_like(getattr(module, key))
+            getattr(module, key).data = torch.full_like(getattr(module, key), 0.5)
 
     with mod_params(
-        module, lambda x, _: torch.ones_like(x), param_keys=mod_param_keys, require_params=require_params
+        module,
+        lambda x, _: torch.ones_like(x),
+        param_keys=mod_param_keys,
+        require_params=require_params,
+        zero_params=zero_params,
     ) as modified:
         for key in param_keys:
             if getattr(module, key, None) is not None:
-                assert torch.all(getattr(modified, key) == 1.0), f'Parameter \'{key}\' was not modified!'
+                if key not in zero_params:
+                    assert torch.all(getattr(modified, key) == 1.0), f'Parameter \'{key}\' was not modified!'
+                else:
+                    assert torch.all(getattr(modified, key) == 0.0), f'Parameter \'{key}\' was not set to zero!'
 
     for key in param_keys:
         if getattr(module, key, None) is not None:
-            assert torch.all(getattr(module, key) == 0.0), f'Parameter \'{key}\' was not restored!'
+            assert torch.all(getattr(module, key) == 0.5), f'Parameter \'{key}\' was not restored!'
 
 
 def test_mod_params_required_missing():
@@ -327,7 +339,8 @@ def test_basic_hook_copy():
         gradient_mapper=(lambda out_grad, outputs: [out_grad for output in outputs]),
         reducer=(lambda inputs, gradients: [input * gradient for input, gradient in zip(inputs, gradients)]),
         param_keys=['weight', 'bias'],
-        require_params=True
+        require_params=True,
+        zero_params=['bias'],
     )
     copy = hook.copy()
 
@@ -337,13 +350,18 @@ def test_basic_hook_copy():
         'output_modifiers',
         'reducer',
         'gradient_mapper',
+    )
+    param_kwarg_keys = (
         'param_keys',
-        'require_params'
+        'require_params',
+        'zero_params',
     )
 
     assert copy is not hook
     for key in attributes:
         assert getattr(copy, key) is getattr(hook, key)
+    for key in param_kwarg_keys:
+        assert copy.param_kwargs[key] is hook.param_kwargs[key]
 
 
 def test_removable_handle_deleted():

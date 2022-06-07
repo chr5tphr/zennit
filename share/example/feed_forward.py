@@ -72,6 +72,7 @@ class AllowEmptyClassImageFolder(ImageFolder):
 @click.option('--n-outputs', type=int, default=1000)
 @click.option('--cpu/--gpu', default=True)
 @click.option('--shuffle/--no-shuffle', default=False)
+@click.option('--with-bias/--no-bias', default=True)
 @click.option('--relevance-norm', type=click.Choice(['symmetric', 'absolute', 'unaligned']), default='symmetric')
 @click.option('--cmap', type=click.Choice(list(CMAPS)), default='coldnhot')
 @click.option('--level', type=float, default=1.0)
@@ -89,6 +90,7 @@ def main(
     n_outputs,
     cpu,
     shuffle,
+    with_bias,
     cmap,
     level,
     relevance_norm,
@@ -158,6 +160,17 @@ def main(
             # the highest and lowest pixel values for the ZBox rule
             composite_kwargs['low'] = norm_fn(torch.zeros(*shape, device=device))
             composite_kwargs['high'] = norm_fn(torch.ones(*shape, device=device))
+
+        # provide the name 'bias' in zero_params if no bias should be used to compute the relevance
+        if not with_bias and composite_name in [
+            'epsilon_gamma_box',
+            'epsilon_plus',
+            'epsilon_alpha2_beta1',
+            'epsilon_plus_flat',
+            'epsilon_alpha2_beta1_flat',
+            'excitation_backprop',
+        ]:
+            composite_kwargs['zero_params'] = ['bias']
 
         # use torchvision specific canonizers, as supplied in the MODELS dict
         composite_kwargs['canonizers'] = [MODELS[model_name][1]()]
