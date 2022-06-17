@@ -18,7 +18,7 @@
 '''Rules based on Hooks'''
 import torch
 
-from .core import Hook, BasicHook, stabilize, expand, ParamMod
+from .core import Hook, BasicHook, Stabilizer, expand, ParamMod
 
 
 def zero_bias(zero_params=None):
@@ -103,17 +103,21 @@ class Epsilon(BasicHook):
 
     Parameters
     ----------
-    epsilon: float, optional
-        Stabilization parameter.
+    epsilon: callable or float, optional
+        Stabilization parameter. If ``epsilon`` is a float, it will be added to the denominator with the same sign as
+        each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected, of
+        which the output corresponds to the stabilized denominator. Note that this is called ``stabilizer`` for all
+        other rules.
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     '''
     def __init__(self, epsilon=1e-6, zero_params=None):
+        stabilizer_fn = Stabilizer.ensure(epsilon)
         super().__init__(
             input_modifiers=[lambda input: input],
             param_modifiers=[NoMod(zero_params=zero_params)],
             output_modifiers=[lambda output: output],
-            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0], epsilon)),
+            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilizer_fn(outputs[0])),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0]),
         )
 
@@ -129,12 +133,17 @@ class Gamma(BasicHook):
     ----------
     gamma: float, optional
         Multiplier for added positive weights.
+    stabilizer: callable or float, optional
+        Stabilization parameter. If ``stabilizer`` is a float, it will be added to the denominator with the same sign
+        as each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected,
+        of which the output corresponds to the stabilized denominator.
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     '''
-    def __init__(self, gamma=0.25, zero_params=None):
+    def __init__(self, gamma=0.25, stabilizer=1e-6, zero_params=None):
         mod_kwargs = {'zero_params': zero_params}
         mod_kwargs_nobias = {'zero_params': zero_bias(zero_params)}
+        stabilizer_fn = Stabilizer.ensure(stabilizer)
         super().__init__(
             input_modifiers=[
                 lambda input: input.clamp(min=0),
@@ -153,7 +162,7 @@ class Gamma(BasicHook):
             output_modifiers=[lambda output: output] * 5,
             gradient_mapper=(
                 lambda out_grad, outputs: [
-                    output * out_grad / stabilize(denom)
+                    output * out_grad / stabilizer_fn(denom)
                     for output, denom in (
                         [(outputs[4] > 0., sum(outputs[:2]))] * 2
                         + [(outputs[4] < 0., sum(outputs[2:4]))] * 2
@@ -172,6 +181,10 @@ class ZPlus(BasicHook):
 
     Parameters
     ----------
+    stabilizer: callable or float, optional
+        Stabilization parameter. If ``stabilizer`` is a float, it will be added to the denominator with the same sign
+        as each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected,
+        of which the output corresponds to the stabilized denominator.
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
 
@@ -181,7 +194,8 @@ class ZPlus(BasicHook):
     :cite:p:`montavon2017explaining` only considers positive inputs, as they are used in ReLU Networks.
     This implementation is effectively alpha=1, beta=0, where negative inputs are allowed.
     '''
-    def __init__(self, zero_params=None):
+    def __init__(self, stabilizer=1e-6, zero_params=None):
+        stabilizer_fn = Stabilizer.ensure(stabilizer)
         super().__init__(
             input_modifiers=[
                 lambda input: input.clamp(min=0),
@@ -192,7 +206,7 @@ class ZPlus(BasicHook):
                 ClampMod(max=0., zero_params=zero_bias(zero_params)),
             ],
             output_modifiers=[lambda output: output] * 2,
-            gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilize(sum(outputs))] * 2),
+            gradient_mapper=(lambda out_grad, outputs: [out_grad / stabilizer_fn(sum(outputs))] * 2),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0] + inputs[1] * gradients[1]),
         )
 
@@ -209,17 +223,22 @@ class AlphaBeta(BasicHook):
         Multiplier for the positive output term.
     beta: float, optional
         Multiplier for the negative output term.
+    stabilizer: callable or float, optional
+        Stabilization parameter. If ``stabilizer`` is a float, it will be added to the denominator with the same sign
+        as each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected,
+        of which the output corresponds to the stabilized denominator.
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
 
     '''
-    def __init__(self, alpha=2., beta=1., zero_params=None):
+    def __init__(self, alpha=2., beta=1., stabilizer=1e-6, zero_params=None):
         if alpha < 0 or beta < 0:
             raise ValueError("Both alpha and beta parameters must be positive!")
         if (alpha - beta) != 1.:
             raise ValueError("The difference of parameters alpha - beta must equal 1!")
         mod_kwargs = {'zero_params': zero_params}
         mod_kwargs_nobias = {'zero_params': zero_bias(zero_params)}
+        stabilizer_fn = Stabilizer.ensure(stabilizer)
 
         super().__init__(
             input_modifiers=[
@@ -237,7 +256,7 @@ class AlphaBeta(BasicHook):
             output_modifiers=[lambda output: output] * 4,
             gradient_mapper=(
                 lambda out_grad, outputs: [
-                    out_grad / stabilize(denom)
+                    out_grad / stabilizer_fn(denom)
                     for denom in ([sum(outputs[:2])] * 2 + [sum(outputs[2:])] * 2)
                 ]
             ),
@@ -266,15 +285,20 @@ class ZBox(BasicHook):
         Lowest pixel values of input. Subject to broadcasting.
     high: :py:class:`torch.Tensor` or float
         Highest pixel values of input. Subject to broadcasting.
+    stabilizer: callable or float, optional
+        Stabilization parameter. If ``stabilizer`` is a float, it will be added to the denominator with the same sign
+        as each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected,
+        of which the output corresponds to the stabilized denominator.
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
 
     '''
-    def __init__(self, low, high, zero_params=None):
+    def __init__(self, low, high, stabilizer=1e-6, zero_params=None):
         def sub(positive, *negatives):
             return positive - sum(negatives)
 
         mod_kwargs = {'zero_params': zero_params}
+        stabilizer_fn = Stabilizer.ensure(stabilizer)
 
         super().__init__(
             input_modifiers=[
@@ -288,7 +312,7 @@ class ZBox(BasicHook):
                 ClampMod(max=0., **mod_kwargs),
             ],
             output_modifiers=[lambda output: output] * 3,
-            gradient_mapper=(lambda out_grad, outputs: (out_grad / stabilize(sub(*outputs)),) * 3),
+            gradient_mapper=(lambda out_grad, outputs: (out_grad / stabilizer_fn(sub(*outputs)),) * 3),
             reducer=(lambda inputs, gradients: sub(*(input * gradient for input, gradient in zip(inputs, gradients)))),
         )
 
@@ -309,12 +333,13 @@ class Norm(BasicHook):
     epsilon only used as a stabilizer, and without the need of the attached layer to have parameters ``weight`` and
     ``bias``.
     '''
-    def __init__(self):
+    def __init__(self, stabilizer=1e-6):
+        stabilizer_fn = Stabilizer.ensure(stabilizer)
         super().__init__(
             input_modifiers=[lambda input: input],
             param_modifiers=[NoMod(param_keys=[])],
             output_modifiers=[lambda output: output],
-            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
+            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilizer_fn(outputs[0])),
             reducer=(lambda inputs, gradients: inputs[0] * gradients[0]),
         )
 
@@ -325,17 +350,22 @@ class WSquare(BasicHook):
 
     Parameters
     ----------
+    stabilizer: callable or float, optional
+        Stabilization parameter. If ``stabilizer`` is a float, it will be added to the denominator with the same sign
+        as each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected,
+        of which the output corresponds to the stabilized denominator.
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     '''
-    def __init__(self, zero_params=None):
+    def __init__(self, stabilizer=1e-6, zero_params=None):
+        stabilizer_fn = Stabilizer.ensure(stabilizer)
         super().__init__(
             input_modifiers=[torch.ones_like],
             param_modifiers=[
                 ParamMod((lambda param, _: param ** 2), zero_params=zero_params),
             ],
             output_modifiers=[lambda output: output],
-            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
+            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilizer_fn(outputs[0])),
             reducer=(lambda inputs, gradients: gradients[0]),
         )
 
@@ -346,18 +376,23 @@ class Flat(BasicHook):
 
     Parameters
     ----------
+    stabilizer: callable or float, optional
+        Stabilization parameter. If ``stabilizer`` is a float, it will be added to the denominator with the same sign
+        as each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected,
+        of which the output corresponds to the stabilized denominator.
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     '''
-    def __init__(self, zero_params=None):
+    def __init__(self, stabilizer=1e-6, zero_params=None):
         mod_kwargs = {'zero_params': zero_bias(zero_params), 'require_params': False}
+        stabilizer_fn = Stabilizer.ensure(stabilizer)
         super().__init__(
             input_modifiers=[torch.ones_like],
             param_modifiers=[
                 ParamMod((lambda param, name: torch.ones_like(param)), **mod_kwargs),
             ],
             output_modifiers=[lambda output: output],
-            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilize(outputs[0])),
+            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilizer_fn(outputs[0])),
             reducer=(lambda inputs, gradients: gradients[0]),
         )
 

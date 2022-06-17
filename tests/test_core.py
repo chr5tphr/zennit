@@ -3,24 +3,98 @@ from itertools import product
 
 import torch
 import pytest
-from helpers import nograd
+from helpers import nograd, prodict
 
-from zennit.core import stabilize, expand, ParamMod, collect_leaves
+from zennit.core import stabilize, expand, ParamMod, collect_leaves, Stabilizer
 from zennit.core import Identity, Hook, BasicHook, RemovableHandle, RemovableHandleList, Composite
 
 
-@pytest.mark.parametrize('input,epsilon,expected', [
-    ([0., -0., 1., -1.], None, [1e-6, 1e-6, 1. + 1e-6, -1. - 1e-6]),
-    ([0., -0., 1., -1.], 1e-3, [1e-3, 1e-3, 1. + 1e-3, -1. - 1e-3]),
-    ([0., -0., 1., -1.], 1., [1., 1., 2., -2.]),
+@pytest.mark.parametrize('kwargs,input,expected', [
+    (
+        {},
+        [0., -0., 1., -1.],
+        [1e-6, 1e-6, 1. + 1e-6, -1. - 1e-6]
+    ), (
+        {'epsilon': 1e-3, 'clip': False, 'norm_scale': False},
+        [0., -0., 1., -1.],
+        [1e-3, 1e-3, 1. + 1e-3, -1. - 1e-3]
+    ), (
+        {'epsilon': 1., 'clip': False, 'norm_scale': False},
+        [0., -0., 1., -1.],
+        [1., 1., 2., -2.]
+    ), (
+        {'epsilon': 1e-6, 'clip': True, 'norm_scale': False},
+        [0., -0., 1., -1.],
+        [1e-6, 1e-6, 1., -1.]
+    ), (
+        {'epsilon': 1e-3, 'clip': True, 'norm_scale': False},
+        [0., -0., 1., -1.],
+        [1e-3, 1e-3, 1., -1.]
+    ), (
+        {'epsilon': 1., 'clip': True, 'norm_scale': False},
+        [0., -0., 1., -1.],
+        [1., 1., 1., -1.]
+    ), (
+        {'epsilon': 1e-6, 'clip': False, 'norm_scale': True},
+        [0., -0., 2., -2.],
+        [1.4142e-6, 1.4142e-6, 2. + 1.4142e-6, -2. - 1.4142e-6]
+    ), (
+        {'epsilon': 1e-3, 'clip': False, 'norm_scale': True},
+        [0., -0., 2., -2.],
+        [1.4142e-3, 1.4142e-3, 2. + 1.4142e-3, -2. - 1.4142e-3]
+    ), (
+        {'epsilon': 1., 'clip': False, 'norm_scale': True},
+        [0., -0., 2., -2.],
+        [1.4142, 1.4142, 3.4142, -3.4142]
+    ), (
+        {'epsilon': 1e-6, 'clip': True, 'norm_scale': True},
+        [0., -0., 2., -2.],
+        [1.4142e-6, 1.4142e-6, 2., -2.]
+    ), (
+        {'epsilon': 1e-3, 'clip': True, 'norm_scale': True},
+        [0., -0., 2., -2.],
+        [1.4142e-3, 1.4142e-3, 2., -2.]
+    ), (
+        {'epsilon': 1., 'clip': True, 'norm_scale': True},
+        [0., -0., 2., -2.],
+        [1.4142, 1.4142, 2., -2.]
+    ),
 ])
-def test_stabilize(input, epsilon, expected):
+def test_stabilize(kwargs, input, expected):
     '''Test whether stabilize produces the expected outputs given some inputs.'''
-    kwargs = {} if epsilon is None else {'epsilon': epsilon}
     input_tensor = torch.tensor(input, dtype=torch.float64)
-    output = stabilize(input_tensor, **kwargs)
+    output = stabilize(input_tensor, dim=0, **kwargs)
     expected_tensor = torch.tensor(expected, dtype=torch.float64)
     assert torch.allclose(expected_tensor, output)
+
+
+@pytest.mark.parametrize('kwargs', prodict(
+    epsilon=[1e-6, 1e-3, 1.],
+    clip=[True, False],
+    norm_scale=[True, False],
+    dim=[None, (0,), (1,), (0, 1)]
+))
+def test_stabilizer_match(kwargs, data_simple):
+    '''Test whether stabilize and Stabilizer produce the same output.'''
+    stabilizer = Stabilizer(**kwargs)
+    stabilizer_out = stabilizer(data_simple)
+    stabilize_out = stabilize(data_simple, **kwargs)
+    assert torch.allclose(stabilizer_out, stabilize_out)
+
+
+@pytest.mark.parametrize('value', [1., 1, Stabilizer(epsilon=1.), lambda x: x])
+def test_stabilizer_ensure(value):
+    '''Test whether Stabilizer.ensure produces a stabilizer with the correct epsilon, or returns callables as-is.'''
+    ensured = Stabilizer.ensure(value)
+    assert not isinstance(value, float) or isinstance(ensured, Stabilizer) and ensured.epsilon == value
+    assert not callable(value) or value is ensured
+
+
+@pytest.mark.parametrize('value', [None, 'wow'])
+def test_stabilizer_ensure_fail(value):
+    '''Test whether Stabilizer.ensure fails on unsupported types.'''
+    with pytest.raises(TypeError):
+        Stabilizer.ensure(value)
 
 
 @pytest.mark.parametrize('input_shape,target_shape,cut_batch_dim', [
