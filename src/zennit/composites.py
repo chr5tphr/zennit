@@ -21,7 +21,7 @@ import torch
 from .core import Composite
 from .layer import Sum
 from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm, ReLUDeconvNet, ReLUGuidedBackprop
-from .types import Convolution, Linear, AvgPool, Activation
+from .types import Convolution, Linear, AvgPool, Activation, BatchNorm
 
 
 class LayerMapComposite(Composite):
@@ -29,7 +29,7 @@ class LayerMapComposite(Composite):
 
     Parameters
     ----------
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
@@ -64,7 +64,7 @@ class SpecialFirstLayerMapComposite(LayerMapComposite):
 
     Parameters
     ----------
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook.
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         Applicable mapping for the first layer, same format as `layer_map`.
@@ -150,11 +150,27 @@ def register_composite(name):
     return wrapped
 
 
-LAYER_MAP_BASE = [
-    (Activation, Pass()),
-    (Sum, Norm()),
-    (AvgPool, Norm())
-]
+def layer_map_base(stabilizer=1e-6):
+    '''Return a basic layer map (list of 2-tuples) shared by all built-in LayerMapComposites.
+
+    Parameters
+    ----------
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
+
+    Returns
+    -------
+    list[tuple[tuple[torch.nn.Module, ...], Hook]]
+        Basic ayer map shared by all built-in LayerMapComposites.
+    '''
+    return [
+        (Activation, Pass()),
+        (Sum, Norm(stabilizer=stabilizer)),
+        (AvgPool, Norm(stabilizer=stabilizer)),
+        (BatchNorm, Pass()),
+    ]
 
 
 @register_composite('epsilon_gamma_box')
@@ -168,11 +184,18 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
         A tensor with the same size as the input, describing the lowest possible pixel values.
     high: obj:`torch.Tensor`
         A tensor with the same size as the input, describing the highest possible pixel values.
-    epsilon: float
-        Epsilon parameter for the epsilon rule.
-    gamma: float
+    epsilon: callable or float, optional
+        Stabilization parameter for the ``Epsilon`` rule. If ``epsilon`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator. Note that this is
+        called ``stabilizer`` for all other rules.
+    gamma: float, optional
         Gamma parameter for the gamma rule.
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
@@ -189,6 +212,7 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
         high,
         epsilon=1e-6,
         gamma=0.25,
+        stabilizer=1e-6,
         layer_map=None,
         first_map=None,
         zero_params=None,
@@ -200,12 +224,12 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
             first_map = []
 
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = layer_map + LAYER_MAP_BASE + [
-            (Convolution, Gamma(gamma=gamma, **rule_kwargs)),
+        layer_map = layer_map + layer_map_base(stabilizer) + [
+            (Convolution, Gamma(gamma=gamma, stabilizer=stabilizer, **rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         first_map = first_map + [
-            (Convolution, ZBox(low=low, high=high, **rule_kwargs))
+            (Convolution, ZBox(low=low, high=high, stabilizer=stabilizer, **rule_kwargs))
         ]
         super().__init__(layer_map=layer_map, first_map=first_map, canonizers=canonizers)
 
@@ -217,9 +241,16 @@ class EpsilonPlus(LayerMapComposite):
 
     Parameters
     ----------
-    epsilon: float
-        Epsilon parameter for the epsilon rule.
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    epsilon: callable or float, optional
+        Stabilization parameter for the ``Epsilon`` rule. If ``epsilon`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator. Note that this is
+        called ``stabilizer`` for all other rules.
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
     zero_params: list[str], optional
@@ -227,13 +258,13 @@ class EpsilonPlus(LayerMapComposite):
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, epsilon=1e-6, layer_map=None, zero_params=None, canonizers=None):
+    def __init__(self, epsilon=1e-6, stabilizer=1e-6, layer_map=None, zero_params=None, canonizers=None):
         if layer_map is None:
             layer_map = []
 
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = layer_map + LAYER_MAP_BASE + [
-            (Convolution, ZPlus(**rule_kwargs)),
+        layer_map = layer_map + layer_map_base(stabilizer) + [
+            (Convolution, ZPlus(stabilizer=stabilizer, **rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         super().__init__(layer_map=layer_map, canonizers=canonizers)
@@ -246,9 +277,16 @@ class EpsilonAlpha2Beta1(LayerMapComposite):
 
     Parameters
     ----------
-    epsilon: float
-        Epsilon parameter for the epsilon rule.
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    epsilon: callable or float, optional
+        Stabilization parameter for the ``Epsilon`` rule. If ``epsilon`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator. Note that this is
+        called ``stabilizer`` for all other rules.
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
     zero_params: list[str], optional
@@ -256,13 +294,13 @@ class EpsilonAlpha2Beta1(LayerMapComposite):
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, epsilon=1e-6, layer_map=None, zero_params=None, canonizers=None):
+    def __init__(self, epsilon=1e-6, stabilizer=1e-6, layer_map=None, zero_params=None, canonizers=None):
         if layer_map is None:
             layer_map = []
 
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = layer_map + LAYER_MAP_BASE + [
-            (Convolution, AlphaBeta(alpha=2, beta=1, **rule_kwargs)),
+        layer_map = layer_map + layer_map_base(stabilizer) + [
+            (Convolution, AlphaBeta(alpha=2, beta=1, stabilizer=stabilizer, **rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         super().__init__(layer_map=layer_map, canonizers=canonizers)
@@ -275,9 +313,16 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
 
     Parameters
     ----------
-    epsilon: float
-        Epsilon parameter for the epsilon rule.
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    epsilon: callable or float, optional
+        Stabilization parameter for the ``Epsilon`` rule. If ``epsilon`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator. Note that this is
+        called ``stabilizer`` for all other rules.
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
@@ -288,19 +333,21 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, epsilon=1e-6, layer_map=None, first_map=None, zero_params=None, canonizers=None):
+    def __init__(
+        self, epsilon=1e-6, stabilizer=1e-6, layer_map=None, first_map=None, zero_params=None, canonizers=None
+    ):
         if layer_map is None:
             layer_map = []
         if first_map is None:
             first_map = []
 
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = layer_map + LAYER_MAP_BASE + [
-            (Convolution, ZPlus(**rule_kwargs)),
+        layer_map = layer_map + layer_map_base(stabilizer) + [
+            (Convolution, ZPlus(stabilizer=stabilizer, **rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         first_map = first_map + [
-            (Linear, Flat(**rule_kwargs))
+            (Linear, Flat(stabilizer=stabilizer, **rule_kwargs))
         ]
         super().__init__(layer_map=layer_map, first_map=first_map, canonizers=canonizers)
 
@@ -312,9 +359,16 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
 
     Parameters
     ----------
-    epsilon: float
-        Epsilon parameter for the epsilon rule.
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    epsilon: callable or float, optional
+        Stabilization parameter for the ``Epsilon`` rule. If ``epsilon`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator. Note that this is
+        called ``stabilizer`` for all other rules.
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
@@ -325,19 +379,21 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, epsilon=1e-6, layer_map=None, first_map=None, zero_params=None, canonizers=None):
+    def __init__(
+        self, epsilon=1e-6, stabilizer=1e-6, layer_map=None, first_map=None, zero_params=None, canonizers=None
+    ):
         if layer_map is None:
             layer_map = []
         if first_map is None:
             first_map = []
 
         rule_kwargs = {'zero_params': zero_params}
-        layer_map = layer_map + LAYER_MAP_BASE + [
-            (Convolution, AlphaBeta(alpha=2, beta=1, **rule_kwargs)),
+        layer_map = layer_map + layer_map_base(stabilizer) + [
+            (Convolution, AlphaBeta(alpha=2, beta=1, stabilizer=stabilizer, **rule_kwargs)),
             (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
         ]
         first_map = first_map + [
-            (Linear, Flat(**rule_kwargs))
+            (Linear, Flat(stabilizer=stabilizer, **rule_kwargs))
         ]
         super().__init__(layer_map=layer_map, first_map=first_map, canonizers=canonizers)
 
@@ -349,7 +405,7 @@ class DeconvNet(LayerMapComposite):
 
     Parameters
     ----------
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
@@ -372,7 +428,7 @@ class GuidedBackprop(LayerMapComposite):
 
     Parameters
     ----------
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
@@ -394,7 +450,7 @@ class ExcitationBackprop(LayerMapComposite):
 
     Parameters
     ----------
-    layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
     zero_params: list[str], optional
@@ -402,14 +458,13 @@ class ExcitationBackprop(LayerMapComposite):
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
-    def __init__(self, layer_map=None, zero_params=None, canonizers=None):
+    def __init__(self, stabilizer=1e-6, layer_map=None, zero_params=None, canonizers=None):
         if layer_map is None:
             layer_map = []
 
-        rule_kwargs = {'zero_params': zero_params}
         layer_map = layer_map + [
-            (Sum, Norm()),
-            (AvgPool, Norm()),
-            (Linear, ZPlus(**rule_kwargs)),
+            (Sum, Norm(stabilizer=stabilizer)),
+            (AvgPool, Norm(stabilizer=stabilizer)),
+            (Linear, ZPlus(stabilizer=stabilizer, zero_params=zero_params)),
         ]
         super().__init__(layer_map=layer_map, canonizers=canonizers)

@@ -23,23 +23,106 @@ from contextlib import contextmanager
 import torch
 
 
-def stabilize(input, epsilon=1e-6):
-    '''Stabilize input for safe division. This shifts zero-elements by ``+ epsilon``. For the sake of the
-    *epsilon rule*, this also shifts positive values by ``+ epsilon`` and negative values by ``- epsilon``.
+class Stabilizer:
+    '''Class to create a stabilizer callable.
+
+    Parameters
+    ----------
+    epsilon: float, optional
+        Value by which to shift/clip elements of ``input``.
+    clip: bool, optional
+        If ``False`` (default), add ``epsilon`` multiplied by each entry's sign (+1 for 0). If ``True``, instead clip
+        the absolute value of ``input`` and multiply it by each entry's original sign.
+    norm_scale: bool, optional
+        If ``False`` (default), ``epsilon`` is added to/used to clip ``input``. If ``True``, scale ``epsilon`` by the
+        square root of the mean over the squared elements of the specified dimensions ``dim``.
+    dim: tuple[int], optional
+        If ``norm_scale`` is ``True``, specifies the dimension over which the scaled norm should be computed (all
+        except dimension 0 by default).
+
+    '''
+    def __init__(self, epsilon=1e-6, clip=False, norm_scale=False, dim=None):
+        self.epsilon = epsilon
+        self.clip = clip
+        self.norm_scale = norm_scale
+        self.dim = dim
+
+    def __call__(self, input):
+        '''Stabilize input for safe division. This shifts zero-elements by ``+ epsilon``. For the sake of the
+        *epsilon rule*, this also shifts positive values by ``+ epsilon`` and negative values by ``- epsilon``.
+
+        Parameters
+        ----------
+        input: :py:obj:`torch.Tensor`
+            Tensor to stabilize.
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`
+            Stabilized ``input``.
+        '''
+        return stabilize(input, self.epsilon, self.clip, self.norm_scale, self.dim)
+
+    @classmethod
+    def ensure(cls, value):
+        '''Given a value, return a stabilizer. If ``value`` is a float, a Stabilizer with that epsilon ``value`` is
+        returned. If ``value`` is callable, it will be used directly as a stabilizer. Otherwise a TypeError will be
+        raised.
+
+        Parameters
+        ----------
+        value: float, int, or callable
+            The value used to produce a valid stabilizer function.
+
+        Returns
+        -------
+        callable or Stabilizer
+            A callable to be used as a stabilizer.
+
+        Raises
+        ------
+        TypeError
+            If no valid stabilizer could be produced from ``value``.
+        '''
+        if isinstance(value, (float, int)):
+            return cls(epsilon=float(value))
+        if callable(value):
+            return value
+        raise TypeError(f'Value {value} is not a valid stabilizer!')
+
+
+def stabilize(input, epsilon=1e-6, clip=False, norm_scale=False, dim=None):
+    '''Stabilize input for safe division.
 
     Parameters
     ----------
     input: :py:obj:`torch.Tensor`
         Tensor to stabilize.
     epsilon: float, optional
-        Value by which to shift elements.
+        Value by which to shift/clip elements of ``input``.
+    clip: bool, optional
+        If ``False`` (default), add ``epsilon`` multiplied by each entry's sign (+1 for 0). If ``True``, instead clip
+        the absolute value of ``input`` and multiply it by each entry's original sign.
+    norm_scale: bool, optional
+        If ``False`` (default), ``epsilon`` is added to/used to clip ``input``. If ``True``, scale ``epsilon`` by the
+        square root of the mean over the squared elements of the specified dimensions ``dim``.
+    dim: tuple[int], optional
+        If ``norm_scale`` is ``True``, specifies the dimension over which the scaled norm should be computed. Defaults
+        to all except dimension 0.
 
     Returns
     -------
     :py:obj:`torch.Tensor`
         New Tensor copied from `input` with values shifted by epsilon.
     '''
-    return input + ((input == 0.).to(input) + input.sign()) * epsilon
+    sign = ((input == 0.).to(input) + input.sign())
+    if norm_scale:
+        if dim is None:
+            dim = tuple(range(1, input.ndim))
+        epsilon = epsilon * ((input ** 2).mean(dim=dim, keepdim=True) ** .5)
+    if clip:
+        return sign * input.abs().clip(min=epsilon)
+    return input + sign * epsilon
 
 
 def expand(tensor, shape, cut_batch_dim=False):
@@ -396,6 +479,7 @@ class BasicHook(Hook):
         output_modifiers=None,
         gradient_mapper=None,
         reducer=None,
+        stabilizer=1e-6,
     ):
         super().__init__()
         modifiers = {
@@ -434,8 +518,8 @@ class BasicHook(Hook):
                 output = out_mod(output)
             inputs.append(input)
             outputs.append(output)
-        gradients = torch.autograd.grad(outputs, inputs, grad_outputs=self.gradient_mapper(grad_output[0], outputs))
-        # relevance = self.reducer([input.detach() for input in inputs], [gradient.detach() for gradient in gradients])
+        grad_outputs = self.gradient_mapper(grad_output[0], outputs)
+        gradients = torch.autograd.grad(outputs, inputs, grad_outputs=grad_outputs)
         relevance = self.reducer(inputs, gradients)
         return tuple(relevance if original.shape == relevance.shape else None for original in grad_input)
 
