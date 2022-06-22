@@ -12,9 +12,10 @@ from torchvision.models import vgg11, resnet18, alexnet
 from helpers import prodict, one_hot_max
 
 from zennit.attribution import identity
-from zennit.core import Composite
+from zennit.core import Composite, Hook
 from zennit.composites import COMPOSITES, NameMapComposite, LayerMapComposite, SpecialFirstLayerMapComposite
 from zennit.composites import EpsilonGammaBox
+from zennit.types import Linear as AnyLinear, Activation
 
 
 def pytest_addoption(parser):
@@ -160,21 +161,57 @@ COMPOSITE_KWARGS = {
 }
 
 
+class PassClone(Hook):
+    '''Clone of the Pass rule.'''
+    def backward(self, module, grad_input, grad_output):
+        '''Directly return grad_output.'''
+        return grad_output
+
+
+class GradClone(Hook):
+    '''Explicit rule to return the cloned gradient.'''
+    def backward(self, module, grad_input, grad_output):
+        '''Directly return grad_output.'''
+        return grad_input.clone()
+
+
+@pytest.fixture(scope='session', params=[
+    None,
+    [(Linear, GradClone()), (Activation, PassClone())],
+])
+def cooperative_layer_map(request):
+    '''Fixture for a cooperative layer map in LayerMapComposite subtypes.'''
+    return request.param
+
+
+@pytest.fixture(scope='session', params=[
+    None,
+    [(AnyLinear, GradClone())],
+])
+def cooperative_first_map(request):
+    '''Fixture for a cooperative layer map for the first layer in SpecialFirstLayerMapComposite subtypes.'''
+    return request.param
+
+
 @pytest.fixture(scope='session', params=[
     elem for elem in COMPOSITES.values()
     if issubclass(elem, LayerMapComposite) and not issubclass(elem, SpecialFirstLayerMapComposite)
 ])
-def layer_map_composite(request):
+def layer_map_composite(request, cooperative_layer_map):
     '''Fixture for explicit LayerMapComposites.'''
-    return request.param(**COMPOSITE_KWARGS.get(request.param, {}))
+    return request.param(layer_map=cooperative_layer_map, **COMPOSITE_KWARGS.get(request.param, {}))
 
 
 @pytest.fixture(scope='session', params=[
     elem for elem in COMPOSITES.values() if issubclass(elem, SpecialFirstLayerMapComposite)
 ])
-def special_first_layer_map_composite(request):
+def special_first_layer_map_composite(request, cooperative_layer_map, cooperative_first_map):
     '''Fixturer for explicit SpecialFirstLayerMapComposites.'''
-    return request.param(**COMPOSITE_KWARGS.get(request.param, {}))
+    return request.param(
+        layer_map=cooperative_layer_map,
+        first_map=cooperative_first_map,
+        **COMPOSITE_KWARGS.get(request.param, {})
+    )
 
 
 @pytest.fixture(scope='session', params=[Composite, *COMPOSITES.values()])
