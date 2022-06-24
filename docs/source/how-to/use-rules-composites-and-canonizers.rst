@@ -128,6 +128,9 @@ layers given various criterions. **Composites** also take care of registering
 all models, and removing their handles after use.
 All available **Composites** can be found in :py:mod:`zennit.composites`.
 
+Built-In Composites
+^^^^^^^^^^^^^^^^^^^
+
 Some built-in composites implement rule-mappings needed for some common
 attribution methods, some of which are
 
@@ -211,9 +214,7 @@ used to ignore the bias in the layer-wise relevance computation:
 
 .. code-block:: python
 
-    import torch
-    from torch.nn import Sequential, Conv2d, ReLU, Linear, Flatten
-    from zennit.composites import EpsilonPlusFlat
+    from zennit.composites import EpsilonGammaBox
 
     # built-in Composites pass some parameters to the respective rules, which
     # can be used for some simple modifications; zero_params is applied to all
@@ -261,6 +262,9 @@ and using :py:func:`~zennit.core.Composite.context`:
 
 There is a third option using :py:class:`zennit.attribution.Attributor`, which is
 explained in :doc:`/how-to/use-attributors`.
+
+Abstract Composites
+^^^^^^^^^^^^^^^^^^^
 
 Finally, there are abstract **Composites** which may be used to specify custom
 **Composites**:
@@ -318,6 +322,7 @@ convolutional layer, we can use
         layer_map=layer_map, first_map=first_map
     )
 
+
 If a composite is made to apply for a single model, a
 :py:class:`~zennit.composites.NameMapComposite` can provide a transparent
 mapping from module name to rule:
@@ -354,6 +359,46 @@ number string as their name. Explicitly assigning a module to a parent module as
 an attribute will assign the attribute as the child module's name. Nested
 modules will have their names split by a dot ``.``.
 
+Cooperative LayerMapComposites
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Instead of defining a full :py:class:`~zennit.composites.LayerMapComposite`, all
+built-in :py:class:`~zennit.composites.LayerMapComposite` and
+:py:class:`~zennit.composites.SpecialFirstLayerMapComposite` subtypes support
+*cooperative layer maps*, which means that they can be supplied with
+``layer_map`` and ``first_map`` (only for the latter) arguments, which will be
+prepended to the existing ``layer_map``.
+Since only the first matching rule will be used in
+:py:class:`~zennit.composites.LayerMapComposite`, this may be used to add or
+overwrite existing mappings. As an example, to modify the built-in
+:py:class:`~zennit.composites.EpsilonGammaBox` by overwriting the first layer's
+original :py:class:`~zennit.rules.ZBox` with the :py:class:`~zennit.rules.Flat`
+rule, use :py:class:`~zennit.rules.ZPlus` for dense linear layers, and ignore
+the BatchNorm contributions, we can write:
+
+.. code-block:: python
+
+    from torch.nn import Linear
+    from zennit.composites import EpsilonGammaBox
+    from zennit.rules import ZPlus, Pass, Flat
+    from zennit.types import Convolution, BatchNorm
+
+    # layer_map and first_map will be prepended to the SpecialFirstLayerMap
+    # subtype; note that low and high still need to be supplied for the ZBox
+    # rule, as it is still part of the composite
+    composite = EpsilonGammaBox(
+        low=-3.,
+        high=3.,
+        layer_map=[
+            (BatchNorm, Pass()),  # ignore BatchNorm
+            (Linear, ZPlus()),  # this is the dense Linear, not any
+        ],
+        first_map=[
+            (Convolution, Flat()),
+        ],
+    )
+
+
 To create custom composites following more complex patterns, see
 :doc:`/how-to/write-custom-composites`.
 
@@ -363,7 +408,7 @@ To create custom composites following more complex patterns, see
 Canonizers
 ----------
 
-Layerwise relevance propagation (LRP) is not implementation invariant.
+Layer-wise relevance propagation (LRP) is not implementation invariant.
 A good example for this is that for some rules, two consecutive linear layers do
 not produce the same attribution as a single linear layer with its weight
 parameter chosen as the product of the two linear layers.
