@@ -151,61 +151,102 @@ def zero_wrap(zero_params):
     return zero_params_wrapper
 
 
-@contextmanager
-def mod_params(module, modifier, param_keys=None, zero_params=None, require_params=True):
-    '''Context manager to temporarily modify parameter attributes (all by default) of a module.
+class ParamMod:
+    '''Class to produce a context manager to temporarily modify parameter attributes (all by default) of a module.
 
     Parameters
     ----------
-    module: :py:obj:`torch.nn.Module`
-        Module of which to modify parameters. If `requires_params` is `True`, it must have all elements given in
-        `param_keys` as attributes (attributes are allowed to be `None`, in which case they are ignored).
     modifier: function
         A function used to modify parameter attributes. If `param_keys` is empty, this is not used.
     param_keys: list[str], optional
-        A list of parameter names that shall be modified. If `None` (default), all parameters are modified (which may be
-        none). If `[]`, no parameters are modified and `modifier` is ignored.
+        A list of parameter names that shall be modified. If `None` (default), all parameters are modified (which may
+        be none). If `[]`, no parameters are modified and `modifier` is ignored.
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     require_params: bool, optional
         Whether existence of `module`'s params is mandatory (True by default). If the attribute exists but is `None`,
         it is not considered missing, and the modifier is not applied.
-
-    Raises
-    ------
-    RuntimeError
-        If `require_params` is `True` and `module` is missing an attribute listed in `param_keys`.
-
-    Yields
-    ------
-    module: :py:obj:`torch.nn.Module`
-        The `module` with appropriate parameters temporarily modified.
     '''
-    try:
-        stored_params = {}
-        if param_keys is None:
-            param_keys = [name for name, _ in module.named_parameters(recurse=False)]
-        if zero_params is None:
-            zero_params = []
+    def __init__(self, modifier, param_keys=None, zero_params=None, require_params=True):
+        self.modifier = modifier
+        self.param_keys = param_keys
+        self.zero_params = zero_params
+        self.require_params = require_params
 
-        missing = [key for key in param_keys if not hasattr(module, key)]
-        if require_params and missing:
-            missing_str = '\', \''.join(missing)
-            raise RuntimeError(f'Module {module} requires missing parameters: \'{missing_str}\'')
+    @classmethod
+    def ensure(cls, modifier):
+        '''If ``modifier`` is an instance of ParamMod, return it as-is, if it is callable, create a new instance with
+        ``modifier`` as the ParamMod's function, otherwise raise a TypeError.
 
-        modifier = zero_wrap(zero_params)(modifier)
+        Parameters
+        ----------
+        modifier : :py:obj:`ParamMod` or callable
+            The modifier which, if necessary, will be used to construct a ParamMod.
 
-        for key in param_keys:
-            if key not in missing:
-                param = getattr(module, key)
-                if param is not None:
-                    stored_params[key] = param
-                    setattr(module, key, torch.nn.Parameter(modifier(param.data, key)))
+        Returns
+        -------
+        :py:obj:`ParamMod`
+            Either ``modifier`` as is, or a :py:obj:`ParamMod` constructed using ``modifier``.
 
-        yield module
-    finally:
-        for key, value in stored_params.items():
-            setattr(module, key, value)
+        Raises
+        ------
+        TypeError
+            If ``modifier`` is neither an instance of :py:obj:`ParamMod`, nor callable.
+        '''
+        if isinstance(modifier, cls):
+            return modifier
+        if callable(modifier):
+            return cls(modifier)
+        raise TypeError(f'{modifier} is neither an instance of {cls}, nor callable!')
+
+    @contextmanager
+    def __call__(self, module):
+        '''Context manager to temporarily modify parameter attributes (all by default) of a module.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            Module of which to modify parameters. If `self.requires_params` is `True`, it must have all elements given
+            in `self.param_keys` as attributes (attributes are allowed to be `None`, in which case they are ignored).
+
+        Raises
+        ------
+        RuntimeError
+            If `self.require_params` is `True` and `module` is missing an attribute listed in `self.param_keys`.
+
+        Yields
+        ------
+        module: :py:obj:`torch.nn.Module`
+            The `module` with appropriate parameters temporarily modified.
+        '''
+        try:
+            stored_params = {}
+            param_keys = self.param_keys
+            zero_params = self.zero_params
+
+            if param_keys is None:
+                param_keys = [name for name, _ in module.named_parameters(recurse=False)]
+            if zero_params is None:
+                zero_params = []
+
+            missing = [key for key in param_keys if not hasattr(module, key)]
+            if self.require_params and missing:
+                missing_str = '\', \''.join(missing)
+                raise RuntimeError(f'Module {module} requires missing parameters: \'{missing_str}\'')
+
+            modifier = zero_wrap(zero_params)(self.modifier)
+
+            for key in param_keys:
+                if key not in missing:
+                    param = getattr(module, key)
+                    if param is not None:
+                        stored_params[key] = param
+                        setattr(module, key, torch.nn.Parameter(modifier(param.data, key)))
+
+            yield module
+        finally:
+            for key, value in stored_params.items():
+                setattr(module, key, value)
 
 
 def collect_leaves(module):
@@ -319,37 +360,34 @@ class Hook:
 
 
 class BasicHook(Hook):
-    '''A hook to compute the layerwise attribution of the module it is attached to.
-    A `BasicHook` instance may only be registered with a single module.
+    '''A hook to compute the layer-wise attribution of the module it is attached to.
+    A BasicHook instance may only be registered with a single module.
 
     Parameters
     ----------
     input_modifiers: list[callable], optional
-        A list of functions to produce multiple inputs. Default is a single input which is the identity.
-    param_modifiers: list[callable], optional
-        A list of functions to temporarily modify the parameters of the attached module for each input produced
-        with `input_modifiers`. Default is unmodified parameters for each input.
+        A list of functions ``(input: torch.Tensor) -> torch.Tensor`` to produce multiple inputs. Default is a single
+        input which is the identity.
+    param_modifiers: list[:py:obj:`~zennit.core.ParamMod` or callable], optional
+        A list of ParamMod instances or functions ``(obj: torch.Tensor, name: str) -> torch.Tensor``, with parameter
+        tensor ``obj``, registered in the root model as ``name``, to temporarily modify the parameters of the attached
+        module for each input produced with `input_modifiers`. Default is unmodified parameters for each input. Use a
+        :py:obj:`~zennit.core.ParamMod` instance to specify which parameters should be modified, whether they are
+        required, and which should be set to zero.
     output_modifiers: list[callable], optional
-        A list of functions to modify the module's output computed using the modified parameters before gradient
-        computation for each input produced with `input_modifier`. Default is the identity for each output.
+        A list of functions ``(input: torch.Tensor) -> torch.Tensor`` to modify the module's output computed using the
+        modified parameters before gradient computation for each input produced with `input_modifier`. Default is the
+        identity for each output.
     gradient_mapper: callable, optional
-        Function to modify upper relevance. Call signature is of form `(grad_output, outputs)` and a tuple of
-        the same size as outputs is expected to be returned. `outputs` has the same size as `input_modifiers` and
-        `param_modifiers`. Default is a stabilized normalization by each of the outputs, multiplied with the output
-        gradient.
+        Function ``(out_grad: torch.Tensor, outputs: list[torch.Tensor]) -> list[torch.Tensor]`` to modify upper
+        relevance. A list or tuple of the same size as ``outputs`` is expected to be returned. ``outputs`` has the same
+        size as ``input_modifiers`` and ``param_modifiers``. Default is a stabilized normalization by each of the
+        outputs, multiplied with the output gradient.
     reducer: callable
-        Function to reduce all the inputs and gradients produced through `input_modifiers` and `param_modifiers`.
-        Call signature is of form `(inputs, gradients)`, where `inputs` and `gradients` have the same as
-        `input_modifiers` and `param_modifiers`. Default is the sum of the multiplications of each input and its
-        corresponding gradient.
-    param_keys: list[str], optional
-        A list of parameter names that shall be modified. If `None` (default), all parameters are modified (which may be
-        none). If `[]`, no parameters are modified and `modifier` is ignored.
-    zero_params: list[str], optional
-        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
-    require_params: bool, optional
-        Whether existence of `module`'s params is mandatory (True by default). If the attribute exists but is `None`,
-        it is not considered missing, and the modifier is not applied.
+        Function ``(inputs: list[torch.Tensor], gradients: list[torch.Tensor]) -> torch.Tensor`` to reduce all the
+        inputs and gradients produced through ``input_modifiers`` and ``param_modifiers``. ``inputs`` and ``gradients``
+        have the same as ``input_modifiers`` and ``param_modifiers``. Default is the sum of the multiplications of each
+        input and its corresponding gradient.
     '''
     def __init__(
         self,
@@ -358,9 +396,6 @@ class BasicHook(Hook):
         output_modifiers=None,
         gradient_mapper=None,
         reducer=None,
-        param_keys=None,
-        zero_params=None,
-        require_params=True
     ):
         super().__init__()
         modifiers = {
@@ -383,12 +418,6 @@ class BasicHook(Hook):
         self.gradient_mapper = gradient_mapper
         self.reducer = reducer
 
-        self.param_kwargs = {
-            'param_keys': param_keys,
-            'zero_params': zero_params,
-            'require_params': require_params
-        }
-
     def forward(self, module, input, output):
         '''Forward hook to save module in-/outputs.'''
         self.stored_tensors['input'] = input
@@ -400,7 +429,7 @@ class BasicHook(Hook):
         outputs = []
         for in_mod, param_mod, out_mod in zip(self.input_modifiers, self.param_modifiers, self.output_modifiers):
             input = in_mod(original_input).requires_grad_()
-            with mod_params(module, param_mod, **self.param_kwargs) as modified, torch.autograd.enable_grad():
+            with ParamMod.ensure(param_mod)(module) as modified, torch.autograd.enable_grad():
                 output = modified.forward(input)
                 output = out_mod(output)
             inputs.append(input)
@@ -422,7 +451,6 @@ class BasicHook(Hook):
             self.output_modifiers,
             self.gradient_mapper,
             self.reducer,
-            **self.param_kwargs,
         )
         return copy
 

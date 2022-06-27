@@ -5,7 +5,7 @@ import torch
 import pytest
 from helpers import nograd
 
-from zennit.core import stabilize, expand, mod_params, collect_leaves
+from zennit.core import stabilize, expand, ParamMod, collect_leaves
 from zennit.core import Identity, Hook, BasicHook, RemovableHandle, RemovableHandleList, Composite
 
 
@@ -69,8 +69,8 @@ def test_expand_shape_invalid(input_shape, target_shape):
     ),
     *product([['weight', 'bias', 'beight', 'wias']], [False], [[]], [False, True]),
 ])
-def test_mod_params(param_keys, require_params, zero_params, bias):
-    '''Test whether mod_params correctly changes and restores parameters of a module.'''
+def test_param_mod(param_keys, require_params, zero_params, bias):
+    '''Test whether ParamMod correctly changes and restores parameters of a module.'''
     module = nograd(torch.nn.Linear(2, 2, bias=bias))
     mod_param_keys = param_keys
     if param_keys is None:
@@ -80,13 +80,14 @@ def test_mod_params(param_keys, require_params, zero_params, bias):
         if getattr(module, key, None) is not None:
             getattr(module, key).data = torch.full_like(getattr(module, key), 0.5)
 
-    with mod_params(
-        module,
+    param_mod = ParamMod(
         lambda x, _: torch.ones_like(x),
         param_keys=mod_param_keys,
         require_params=require_params,
         zero_params=zero_params,
-    ) as modified:
+    )
+
+    with param_mod(module) as modified:
         for key in param_keys:
             if getattr(module, key, None) is not None:
                 if key not in zero_params:
@@ -99,13 +100,30 @@ def test_mod_params(param_keys, require_params, zero_params, bias):
             assert torch.all(getattr(module, key) == 0.5), f'Parameter \'{key}\' was not restored!'
 
 
-def test_mod_params_required_missing():
-    '''Test wether mod_params raises a RuntimeError when it is missing parameters when require_params=True.'''
+def test_param_mod_required_missing():
+    '''Test wether ParamMod raises a RuntimeError when it is missing parameters when require_params=True.'''
     module = torch.nn.Module()
     param_keys = ['beight', 'wias']
+    param_mod = ParamMod(lambda x, _: torch.ones_like(x), param_keys=param_keys, require_params=True)
     with pytest.raises(RuntimeError):
-        with mod_params(module, lambda x, _: torch.ones_like(x), param_keys=param_keys, require_params=True):
+        with param_mod(module):
             pass
+
+
+@pytest.mark.parametrize('modifier', [lambda x: x, ParamMod(lambda x: x)])
+def test_param_mod_ensure(modifier):
+    '''Test wether ParamMod.ensure returns the original object if it is an instance of ParamMod, or a new instance of
+    ParamMod if it is not an instance of ParamMod and callable.'''
+    result = ParamMod.ensure(modifier)
+    assert isinstance(result, ParamMod)
+    assert not isinstance(modifier, ParamMod) or result is modifier
+
+
+def test_param_mod_ensure_unknown_type():
+    '''Test wether ParamMod.ensure raises a TypeError when it is called on a non-callable object that is not of type
+    ParamMod.'''
+    with pytest.raises(TypeError):
+        ParamMod.ensure(None)
 
 
 def test_collect_leaves_dummy():
@@ -304,12 +322,16 @@ def test_basic_hook_custom():
 
     hook = BasicHook(
         input_modifiers=[assert_inputs],
-        param_modifiers=[assert_params],
+        param_modifiers=[
+            ParamMod(
+                assert_params,
+                param_keys=['weight', 'bias'],
+                require_params=True,
+            )
+        ],
         output_modifiers=[assert_outputs],
         gradient_mapper=assert_gradient,
         reducer=assert_reducer,
-        param_keys=['weight', 'bias'],
-        require_params=True
     )
 
     call_events = ('input', 'params', 'output', 'gradient', 'reducer')
@@ -334,13 +356,17 @@ def test_basic_hook_copy():
     '''Test whether BasicHook.copy copies the Hook correctly.'''
     hook = BasicHook(
         input_modifiers=[lambda obj, name: obj],
-        param_modifiers=[lambda obj, name: obj],
+        param_modifiers=[
+            ParamMod(
+                (lambda obj, name: obj),
+                param_keys=['weight', 'bias'],
+                require_params=True,
+                zero_params=['bias'],
+            ),
+        ],
         output_modifiers=[lambda obj, name: obj],
         gradient_mapper=(lambda out_grad, outputs: [out_grad for output in outputs]),
         reducer=(lambda inputs, gradients: [input * gradient for input, gradient in zip(inputs, gradients)]),
-        param_keys=['weight', 'bias'],
-        require_params=True,
-        zero_params=['bias'],
     )
     copy = hook.copy()
 
@@ -351,17 +377,10 @@ def test_basic_hook_copy():
         'reducer',
         'gradient_mapper',
     )
-    param_kwarg_keys = (
-        'param_keys',
-        'require_params',
-        'zero_params',
-    )
 
     assert copy is not hook
     for key in attributes:
         assert getattr(copy, key) is getattr(hook, key)
-    for key in param_kwarg_keys:
-        assert copy.param_kwargs[key] is hook.param_kwargs[key]
 
 
 def test_removable_handle_deleted():
