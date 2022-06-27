@@ -8,6 +8,7 @@ import pytest
 import torch
 from zennit.rules import Epsilon, ZPlus, AlphaBeta, Gamma, ZBox, Norm, WSquare, Flat
 from zennit.rules import Pass, ReLUDeconvNet, ReLUGuidedBackprop
+from zennit.rules import zero_bias as name_zero_bias
 
 
 def stabilize(input, epsilon=1e-6):
@@ -129,10 +130,22 @@ def rule_zplus(weight, bias, input, relevance, zero_params=None):
 @matrix_form
 def rule_gamma(weight, bias, input, relevance, gamma, zero_params=None):
     '''Replicates the Gamma rule.'''
+    output = input @ weight.t() + bias
     bias = zero_bias(zero_params, bias)
-    wgamma = weight + weight.clamp(min=0) * gamma
-    bgamma = bias + bias.clamp(min=0) * gamma
-    return input * ((relevance / stabilize(input @ wgamma.t() + bgamma)) @ wgamma)
+    pinput = input.clamp(min=0)
+    ninput = input.clamp(max=0)
+    pwgamma = weight + weight.clamp(min=0) * gamma
+    nwgamma = weight + weight.clamp(max=0) * gamma
+    pbgamma = bias + bias.clamp(min=0) * gamma
+    nbgamma = bias + bias.clamp(max=0) * gamma
+
+    pgrad_out = (relevance / stabilize(pinput @ pwgamma.t() + ninput @ nwgamma.t() + pbgamma)) * (output > 0.)
+    positive = pinput * (pgrad_out @ pwgamma) + ninput * (pgrad_out @ nwgamma)
+
+    ngrad_out = (relevance / stabilize(pinput @ nwgamma.t() + ninput @ pwgamma.t() + nbgamma)) * (output < 0.)
+    negative = pinput * (ngrad_out @ nwgamma) + ninput * (ngrad_out @ pwgamma)
+
+    return positive + negative
 
 
 @replicates(RULES_LINEAR, AlphaBeta, alpha=2.0, beta=1.0)
@@ -258,3 +271,11 @@ def test_alpha_beta_invalid_values():
         AlphaBeta(beta=-1.)
     with pytest.raises(ValueError):
         AlphaBeta(alpha=1., beta=1.)
+
+
+@pytest.mark.parametrize('params', [None, 'weight', ['weight'], 'bias', ['bias'], ['weight', 'bias']])
+def test_zero_bias(params):
+    '''Test whether zero_bias correctly appends 'bias' to the zero_params list/str used for ParamMod.'''
+    result = name_zero_bias(params)
+    assert isinstance(result, list)
+    assert 'bias' in result

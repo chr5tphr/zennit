@@ -207,9 +207,10 @@ functions:
 
 * ``input_modifiers``, which is a tuple of :math:`K` functions, each with a
   single argument to modify the input tensor,
-* ``param_modifiers``, which is a tuple of :math:`K` functions,each with two
-  arguments, the parameter tensor ``obj`` and its name ``name`` (e.g. ``weight``
-  or ``bias``), to modify the parameter,
+* ``param_modifiers``, which is a tuple of :math:`K` functions or
+  :py:class:`~zennit.core.ParamMod` instances, each with two arguments, the
+  parameter tensor ``obj`` and its name ``name`` (e.g. ``weight`` or ``bias``),
+  to modify the parameter,
 * ``output_modifiers``, which is a tuple of :math:`K` functions, each with a
   single argument to modify the output tensor, each produced by applying the
   module with a modified input and its respective modified parameters,
@@ -379,10 +380,46 @@ modifiers in order to take negative input values into account.
 We recommend taking a look at the implementation of each rule in
 :py:mod:`zennit.rules` for more examples.
 
-There are two more arguments to :py:class:`~zennit.core.BasicHook`:
+For more control over the parameter modification,
+:py:class:`~zennit.core.ParamMod` instances may be used in ``param_modifiers``.
+A common use-case for this is to specify a number of parameter names which
+should be set to zero instead of applying the modification:
+
+.. code-block:: python
+
+    import torch
+    from zennit.core import BasicHook, ParamMod
+
+
+    lrp_zplus_hook = BasicHook(
+         param_modifiers=[ParamMod(lambda x, _: x.clip(min=0.), zero_params='bias')],
+    )
+
+    input = torch.randn(1, 4, requires_grad=True)
+    module = torch.nn.Linear(4, 4)
+
+    handles = lrp_zplus_hook.register(module)
+    output = module(input)
+    grad, = torch.autograd.grad(output, input, torch.ones_like(output))
+    handles.remove()
+
+This is used in all built-in rules based on :py:class:`~zennit.core.BasicHook`,
+where the argument ``zero_params`` is passed to all applicable
+:py:class:`~zennit.core.ParamMod` arguments.
+
+There are two more arguments to :py:class:`~zennit.core.ParamMod`:
 
 * ``param_keys``, an optional list of parameter names that should be modified,
   which when ``None`` (default), will modify all parameters, and
 * ``require_params``, an optional flag to indicate whether the specified
   ``param_keys`` are mandatory (``True``, default). A missing parameter with
   ``param_keys=True`` will cause a ``RuntimeError`` during the backward pass.
+
+During the backward pass inside :py:class:`~zennit.core.BasicHook`, functions
+will be internally converted to :py:class:`~zennit.core.ParamMod` with default
+parameters.
+
+The built-in rules furthermore introduce subclasses of
+:py:class:`~zennit.core.ParamMod` for the common modifiers
+:py:class:`~zennit.rules.ClampMod`, :py:class:`~zennit.rules.GammaMod`, and
+:py:class:`~zennit.rules.NoMod`.

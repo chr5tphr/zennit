@@ -178,6 +178,8 @@ class EpsilonGammaBox(SpecialFirstLayerMapComposite):
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         Applicable mapping for the first layer, same format as `layer_map`. This will be prepended to the ``first_map``
         defined by the composite.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
@@ -220,6 +222,8 @@ class EpsilonPlus(LayerMapComposite):
     layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
@@ -247,6 +251,8 @@ class EpsilonAlpha2Beta1(LayerMapComposite):
     layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
@@ -277,6 +283,8 @@ class EpsilonPlusFlat(SpecialFirstLayerMapComposite):
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         Applicable mapping for the first layer, same format as `layer_map`. This will be prepended to the ``first_map``
         defined by the composite.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
@@ -312,6 +320,8 @@ class EpsilonAlpha2Beta1Flat(SpecialFirstLayerMapComposite):
     first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         Applicable mapping for the first layer, same format as `layer_map`. This will be prepended to the ``first_map``
         defined by the composite.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
@@ -387,6 +397,8 @@ class ExcitationBackprop(LayerMapComposite):
     layer_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
     canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
         List of canonizer instances to be applied before applying hooks.
     '''
