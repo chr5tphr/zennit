@@ -210,7 +210,7 @@ Some built-in rules also expose some of the parameters of their respective
 **Rules**, like the ``epsilon`` for :py:class:`~zennit.rules.Epsilon`, the
 ``gamma`` for :py:class:`~zennit.rules.Gamma`, and ``zero_params`` for all
 **Rules** based on :py:class:`~zennit.core.BasicHook`, which can for example be
-used to ignore the bias in the layer-wise relevance computation:
+used to set the bias to zero during the layer-wise relevance computation:
 
 .. code-block:: python
 
