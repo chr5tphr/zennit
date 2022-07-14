@@ -136,9 +136,9 @@ def test_integrated_gradients_path(data_simple):
 
     assert len(model.tensors) == n_iter, 'IntegratedGradients iterations did not match n_iter!'
 
-    data_simple_norm = data_simple / torch.linalg.norm(data_simple, dim=dims, keepdim=True)
+    data_simple_norm = data_simple / (data_simple ** 2).sum(dim=dims, keepdim=True) ** .5
     assert all(
-        torch.allclose(step / torch.linalg.norm(step, dim=dims, keepdim=True), data_simple_norm)
+        torch.allclose(step / (step ** 2).sum(dim=dims, keepdim=True) ** .5, data_simple_norm)
         for step in model.tensors
     ), 'IntegratedGradients segments do not lie on path!'
     assert torch.allclose(data_simple, grad), 'IntegratedGradients of identity is wrong!'
