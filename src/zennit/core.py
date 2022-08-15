@@ -172,7 +172,7 @@ def expand(tensor, shape, cut_batch_dim=False):
             and tensor.shape[0] > shape[0]
         ):
             return tensor[:shape[0]].expand(shape)
-    raise RuntimeError('Invalid shape! Target: {tensor.shape}; Source: {shape}')
+    raise RuntimeError(f'Invalid shape! Target: {tensor.shape}; Source: {shape}')
 
 
 def zero_wrap(zero_params):
