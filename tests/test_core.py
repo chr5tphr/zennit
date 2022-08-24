@@ -1,5 +1,5 @@
 '''Tests for core functionality in zennit.core.'''
-from itertools import product
+from itertools import product, islice
 
 import torch
 import pytest
@@ -285,8 +285,8 @@ def test_hook_no_grad():
     '''Test whether Hook's backward is never called when no gradient is required.'''
     called = set()
 
-    linear = torch.nn.Linear(2, 2)
     data = torch.randn(1, 2, requires_grad=False)
+    linear = torch.nn.Linear(2, 2)
 
     class DummyHook(Hook):
         '''Dummy subclass of Hook to check whether forward and backward are called.'''
@@ -306,6 +306,84 @@ def test_hook_no_grad():
         assert 'backward' not in called
     finally:
         handles.remove()
+
+
+def test_hook_active():
+    '''Test whether Hook's backward is only called when ``hook.active=True``.'''
+    called = set()
+
+    linear = torch.nn.Linear(2, 2)
+    data = torch.randn(1, 2, requires_grad=True)
+
+    class DummyHook(Hook):
+        '''Dummy subclass of Hook to check whether forward and backward are called.'''
+        def forward(self, module, input, output):
+            '''Check whether forward is called.'''
+            called.add('forward')
+
+        def backward(self, module, grad_input, grad_output):
+            '''Check whether backward is called.'''
+            called.add('backward')
+
+    hook = DummyHook()
+    for active in (False, True):
+        handles = hook.register(linear)
+        try:
+            hook.active = active
+            out = linear(data)
+            torch.autograd.grad(out.sum(), data)
+            assert 'forward' in called
+            assert active == ('backward' in called)
+        finally:
+            handles.remove()
+
+
+def test_hook_grad_grad():
+    '''Test whether the second order gradient is correct when registering a Hook.'''
+    linear = torch.nn.Linear(2, 2)
+    data = torch.randn(1, 2, requires_grad=True)
+
+    class InputXGrad(Hook):
+        '''InputXGrad implementation for testing.'''
+        def forward(self, module, input, output):
+            '''Store input for backward pass'''
+            self.stored_tensors['input'] = input
+
+        def backward(self, module, grad_input, grad_output):
+            '''Compute InputXGrad.'''
+            hin = self.stored_tensors['input'][0]
+            with torch.autograd.enable_grad():
+                hout = module.forward(hin)
+            hgrad, = torch.autograd.grad(hout, hin, grad_outputs=grad_output[0], create_graph=True)
+            return (hin * hgrad,)
+
+    # true (modified) grad
+    true_grad = data * linear.weight.sum(0)
+    true_gradgrad = linear.weight.sum(0)
+
+    hook = InputXGrad()
+    handles = hook.register(linear)
+    try:
+        out = linear(data)
+
+        # grad should be the true (modified) grad
+        grad, = torch.autograd.grad(out, data, torch.ones_like(out), create_graph=True)
+        assert torch.allclose(grad, true_grad)
+
+        # wrong grad computation, will be equal to grad
+        gradgrad, = torch.autograd.grad(grad, data, torch.ones_like(grad), retain_graph=True)
+        assert torch.allclose(gradgrad, grad)
+
+        hook.active = False
+        # setting hook.active=False should now give the correct gradgrad
+        gradgrad, = torch.autograd.grad(grad, data, torch.ones_like(grad), retain_graph=True)
+        assert torch.allclose(gradgrad, true_gradgrad)
+    finally:
+        hook.active = True
+        handles.remove()
+    # removing the hook should also give the correct gradgrad
+    gradgrad, = torch.autograd.grad(grad, data, torch.ones_like(grad))
+    assert torch.allclose(gradgrad, true_gradgrad)
 
 
 def test_hook_copy():
@@ -552,3 +630,28 @@ def test_composite_empty():
         assert 'apply' in called
         assert 'remove' not in called
     assert 'remove' in called
+
+
+def test_composite_inactive():
+    '''Test whether a composite changes its hook's ``.active`` as expected.'''
+    linear = torch.nn.Linear(2, 2)
+
+    def module_map(ctx, name, module):
+        return Hook()
+
+    composite = Composite(module_map=module_map)
+
+    # ensure no hooks are registered
+    assert not list(islice(composite.hook_refs, 1))
+    with composite.context(linear):
+        # ensure hooks are registered
+        assert list(islice(composite.hook_refs, 1))
+        # check if all hooks are active
+        assert all(hook.active for hook in composite.hook_refs)
+        with composite.inactive():
+            # check if no hooks are active
+            assert all(not hook.active for hook in composite.hook_refs)
+        # check that all hooks are active again
+        assert all(hook.active for hook in composite.hook_refs)
+    # ensure no hooks are registered
+    assert not list(islice(composite.hook_refs, 1))

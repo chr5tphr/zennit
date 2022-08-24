@@ -12,6 +12,7 @@ These How-Tos give more detailed information on how to use Zennit.
     use-attributors
     visualize-results
     get-intermediate-relevance
+    compute-second-order-gradients
     write-custom-composites
     write-custom-canonizers
     write-custom-rules

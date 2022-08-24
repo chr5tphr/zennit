@@ -7,7 +7,7 @@ from copy import deepcopy
 import pytest
 import torch
 from zennit.rules import Epsilon, ZPlus, AlphaBeta, Gamma, ZBox, Norm, WSquare, Flat
-from zennit.rules import Pass, ReLUDeconvNet, ReLUGuidedBackprop
+from zennit.rules import Pass, ReLUDeconvNet, ReLUGuidedBackprop, ReLUBetaSmooth
 from zennit.rules import zero_bias as name_zero_bias
 
 
@@ -222,6 +222,13 @@ def rule_relu_deconvnet(module, input, relevance):
 def rule_relu_guidedbackprop(gradient, input, relevance):
     '''Replicates the ReLUGuidedBackprop rule.'''
     return gradient * (relevance > 0.)
+
+
+@replicates(RULES_SIMPLE, ReLUBetaSmooth, beta_smooth=10.)
+@replicates(RULES_SIMPLE, ReLUBetaSmooth, beta_smooth=1.)
+def rule_relu_beta_smooth(module, input, relevance, beta_smooth):
+    '''Replicates the ReLUBetaSmooth rule.'''
+    return relevance * torch.sigmoid(beta_smooth * input)
 
 
 @pytest.fixture(scope='session', params=RULES_LINEAR)

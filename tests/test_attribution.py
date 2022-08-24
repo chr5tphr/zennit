@@ -20,6 +20,19 @@ class IdentityLogger(torch.nn.Module):
         return self.tensors[-1]
 
 
+def test_gradient_attributor_inactive(
+    data_linear, model_simple, model_simple_output, any_composite, grad_outputs_func
+):
+    '''Test whether composite context and attributor match for Gradient.'''
+
+    with Gradient(model=model_simple, composite=any_composite, attr_output=grad_outputs_func) as attributor:
+        # verify that all hooks are active
+        assert all(hook.active for hook in attributor.composite.hook_refs)
+        with attributor.inactive():
+            # verify that all hooks are inactive
+            assert all(not hook.active for hook in attributor.composite.hook_refs)
+
+
 def test_gradient_attributor_composite(
     data_linear, model_simple, model_simple_output, any_composite, grad_outputs_func
 ):
@@ -61,6 +74,19 @@ def test_gradient_attributor_output_fn(data_simple, grad_outputs_func, use_const
     assert torch.allclose(expected_grad, grad), 'Attributor output function gradient mismatch!'
 
 
+def test_gradient_attributor_grad(data_simple):
+    '''Test whether the gradient of Gradient matches.'''
+    model = torch.nn.Softplus(beta=1.)
+    data = data_simple.view_as(data_simple).requires_grad_()
+    target = torch.sigmoid(data) * (1 - torch.sigmoid(data))
+
+    with Gradient(model=model, create_graph=True) as attributor:
+        _, grad = attributor(data, torch.ones_like)
+    gradgrad, = torch.autograd.grad(grad.sum(), data)
+
+    assert torch.allclose(gradgrad, target), 'Gradient Attributor second order gradient mismatch!'
+
+
 def test_gradient_attributor_output_fn_precedence(data_simple):
     '''Test whether the gradient attributor attr_output at call is prefered when it is supplied at both initialization
     and call.
@@ -84,6 +110,19 @@ def test_smooth_grad_single(data_linear, model_simple, model_simple_output, mode
 
     assert torch.allclose(model_simple_grad, grad)
     assert torch.allclose(model_simple_output, output)
+
+
+def test_smooth_grad_single_grad(data_simple):
+    '''Test whether the gradient of SmoothGrad matches.'''
+    model = torch.nn.Softplus(beta=1.)
+    data = data_simple.view_as(data_simple).requires_grad_()
+    target = torch.sigmoid(data) * (1 - torch.sigmoid(data))
+
+    with SmoothGrad(model=model, noise_level=0.1, n_iter=1, create_graph=True) as attributor:
+        _, grad = attributor(data, torch.ones_like)
+    gradgrad, = torch.autograd.grad(grad.sum(), data)
+
+    assert torch.allclose(gradgrad, target), 'SmoothGrad Attributor second order gradient mismatch!'
 
 
 @pytest.mark.parametrize('noise_level', [0.0, 0.1, 0.3, 0.5])
@@ -126,6 +165,20 @@ def test_integrated_gradients_single(data_linear, model_simple, model_simple_out
 
     assert torch.allclose(expected_grad, grad), 'Gradient mismatch for IntegratedGradients!'
     assert torch.allclose(model_simple_output, output), 'Output mismatch for IntegratedGradients!'
+
+
+def test_integrated_gradients_single_grad(data_simple):
+    '''Test whether the gradient of IntegratedGradients matches.'''
+    model = torch.nn.Softplus(beta=1.)
+    data = data_simple.view_as(data_simple).requires_grad_()
+    # this is d/dx (x * d/dx softplus(x)), i.e. the gradient of input times gradient of softplus
+    target = torch.sigmoid(data) * (1 - torch.sigmoid(data)) * data + torch.sigmoid(data)
+
+    with IntegratedGradients(model=model, n_iter=1, baseline_fn=torch.zeros_like, create_graph=True) as attributor:
+        _, grad = attributor(data, torch.ones_like)
+    gradgrad, = torch.autograd.grad(grad.sum(), data)
+
+    assert torch.allclose(gradgrad, target), 'IntegratedGradients Attributor second order gradient mismatch!'
 
 
 def test_integrated_gradients_path(data_simple):

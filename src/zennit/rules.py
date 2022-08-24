@@ -409,3 +409,30 @@ class ReLUGuidedBackprop(Hook):
     def backward(self, module, grad_input, grad_output):
         '''Modify ReLU gradient according to GuidedBackprop :cite:p:`springenberg2015striving`.'''
         return (grad_input[0] * (grad_output[0] > 0.),)
+
+
+class ReLUBetaSmooth(Hook):
+    '''Modify ReLU gradient to smooth softplus gradient :cite:p:`dombrowski2019explanations`. Used to obtain meaningful
+    surrogate gradients to compute higher order gradients with ReLUs. Equivalent to changing the gradient to be the
+    (scaled) logistic function (sigmoid).
+
+    Parameters
+    ----------
+    beta_smooth: float, optional
+        The beta parameter for the softplus gradient (i.e. ``sigmoid(beta * input)``). Defaults to ``10``.
+    '''
+    def __init__(self, beta_smooth=10.):
+        super().__init__()
+        self.beta_smooth = beta_smooth
+
+    def copy(self):
+        '''Return a copy of this hook with the same beta parameter.'''
+        return self.__class__(beta_smooth=self.beta_smooth)
+
+    def forward(self, module, input, output):
+        '''Remember the input for the backward pass.'''
+        self.stored_tensors['input'] = input
+
+    def backward(self, module, grad_input, grad_output):
+        '''Modify ReLU gradient to the smooth softplus gradient :cite:p:`dombrowski2019explanations`.'''
+        return (torch.sigmoid(self.beta_smooth * self.stored_tensors['input'][0]) * grad_output[0],)

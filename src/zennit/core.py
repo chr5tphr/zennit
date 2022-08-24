@@ -373,6 +373,8 @@ class Hook:
     '''Base class for hooks to be used to compute layerwise attributions.'''
     def __init__(self):
         self.stored_tensors = {}
+        self.active = True
+        self.tensor_handles = RemovableHandleList()
 
     def pre_forward(self, module, input):
         '''Apply an Identity to the input before the module to register a backward hook.'''
@@ -380,15 +382,22 @@ class Hook:
 
         @functools.wraps(self.backward)
         def wrapper(grad_input, grad_output):
-            return hook_ref().backward(module, grad_input, hook_ref().stored_tensors['grad_output'])
+            hook = hook_ref()
+            if hook is not None and hook.active:
+                return hook.backward(module, grad_input, hook.stored_tensors['grad_output'])
+            return None
 
         if not isinstance(input, tuple):
             input = (input,)
 
+        # only if gradient required
         if input[0].requires_grad:
-            # only if gradient required
+            # add identity to ensure .grad_fn exists
             post_input = Identity.apply(*input)
-            post_input[0].grad_fn.register_hook(wrapper)
+            # register the input tensor gradient hook
+            self.tensor_handles.append(
+                post_input[0].grad_fn.register_hook(wrapper)
+            )
             # work around to support in-place operations
             post_input = tuple(elem.clone() for elem in post_input)
         else:
@@ -402,14 +411,20 @@ class Hook:
 
         @functools.wraps(self.pre_backward)
         def wrapper(grad_input, grad_output):
-            return hook_ref().pre_backward(module, grad_input, grad_output)
+            hook = hook_ref()
+            if hook is not None and hook.active:
+                return hook.pre_backward(module, grad_input, grad_output)
+            return None
 
         if not isinstance(output, tuple):
             output = (output,)
 
+        # only if gradient required
         if output[0].grad_fn is not None:
-            # only if gradient required
-            output[0].grad_fn.register_hook(wrapper)
+            # register the output tensor gradient hook
+            self.tensor_handles.append(
+                output[0].grad_fn.register_hook(wrapper)
+            )
         return output[0] if len(output) == 1 else output
 
     def pre_backward(self, module, grad_input, grad_output):
@@ -431,6 +446,7 @@ class Hook:
     def remove(self):
         '''When removing hooks, remove all references to stored tensors'''
         self.stored_tensors.clear()
+        self.tensor_handles.remove()
 
     def register(self, module):
         '''Register this instance by registering all hooks to the supplied module.'''
@@ -508,7 +524,7 @@ class BasicHook(Hook):
 
     def backward(self, module, grad_input, grad_output):
         '''Backward hook to compute LRP based on the class attributes.'''
-        original_input = self.stored_tensors['input'][0].detach()
+        original_input = self.stored_tensors['input'][0].clone()
         inputs = []
         outputs = []
         for in_mod, param_mod, out_mod in zip(self.input_modifiers, self.param_modifiers, self.output_modifiers):
@@ -519,7 +535,12 @@ class BasicHook(Hook):
             inputs.append(input)
             outputs.append(output)
         grad_outputs = self.gradient_mapper(grad_output[0], outputs)
-        gradients = torch.autograd.grad(outputs, inputs, grad_outputs=grad_outputs)
+        gradients = torch.autograd.grad(
+            outputs,
+            inputs,
+            grad_outputs=grad_outputs,
+            create_graph=grad_output[0].requires_grad
+        )
         relevance = self.reducer(inputs, gradients)
         return tuple(relevance if original.shape == relevance.shape else None for original in grad_input)
 
@@ -618,6 +639,7 @@ class Composite:
         self.canonizers = canonizers
 
         self.handles = RemovableHandleList()
+        self.hook_refs = weakref.WeakSet()
 
     def register(self, module):
         '''Apply all canonizers and register all hooks to a module (and its recursive children).
@@ -630,7 +652,7 @@ class Composite:
             Hooks and canonizers will be applied to this module recursively according to ``module_map`` and
             ``canonizers``.
         '''
-        self.handles.remove()
+        self.remove()
 
         for canonizer in self.canonizers:
             self.handles += canonizer.apply(module)
@@ -640,6 +662,7 @@ class Composite:
             template = self.module_map(ctx, name, child)
             if template is not None:
                 hook = template.copy()
+                self.hook_refs.add(hook)
                 self.handles.append(hook.register(child))
 
     def remove(self):
@@ -648,6 +671,7 @@ class Composite:
         Canonizers will revert the state of the modules they changed.
         '''
         self.handles.remove()
+        self.hook_refs.clear()
 
     def context(self, module):
         '''Return a CompositeContext object with this instance and the supplied module.
@@ -663,6 +687,19 @@ class Composite:
             A context object which registers the composite to ``module`` on entering, and removes it on exiting.
         '''
         return CompositeContext(module, self)
+
+    @contextmanager
+    def inactive(self):
+        '''Context manager to temporarily deactivate the gradient modification. This can be used to compute the
+        gradient of the modified gradient.
+        '''
+        try:
+            for hook in self.hook_refs:
+                hook.active = False
+            yield self
+        finally:
+            for hook in self.hook_refs:
+                hook.active = True
 
     @staticmethod
     def _empty_module_map(ctx, name, module):
