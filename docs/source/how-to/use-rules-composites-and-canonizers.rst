@@ -421,6 +421,8 @@ number string as their name. Explicitly assigning a module to a parent module as
 an attribute will assign the attribute as the child module's name. Nested
 modules will have their names split by a dot ``.``.
 
+.. _cooperative-layermapcomposites:
+
 Cooperative LayerMapComposites
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

@@ -20,7 +20,8 @@ import torch
 
 from .core import Composite
 from .layer import Sum
-from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm, ReLUDeconvNet, ReLUGuidedBackprop
+from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm
+from .rules import ReLUDeconvNet, ReLUGuidedBackprop, ReLUBetaSmooth
 from .types import Convolution, Linear, AvgPool, Activation, BatchNorm
 
 
@@ -466,5 +467,33 @@ class ExcitationBackprop(LayerMapComposite):
             (Sum, Norm(stabilizer=stabilizer)),
             (AvgPool, Norm(stabilizer=stabilizer)),
             (Linear, ZPlus(stabilizer=stabilizer, zero_params=zero_params)),
+        ]
+        super().__init__(layer_map=layer_map, canonizers=canonizers)
+
+
+@register_composite('beta_smooth')
+class BetaSmooth(LayerMapComposite):
+    '''Explicit composite to modify ReLU gradients to smooth softplus gradients :cite:p:`dombrowski2019explanations`.
+    Used to obtain meaningful surrogate gradients to compute higher order gradients with ReLUs. Equivalent to changing
+    the gradient to be the (scaled) logistic function (sigmoid).
+
+    Parameters
+    ----------
+    beta_smooth: float, optional
+        The beta parameter for the softplus gradient (i.e. ``sigmoid(beta * input)``). Defaults to ``10``.
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
+    '''
+    def __init__(self, beta_smooth=10., layer_map=None, zero_params=None, canonizers=None):
+        if layer_map is None:
+            layer_map = []
+
+        layer_map = layer_map + [
+            (torch.nn.ReLU, ReLUBetaSmooth()),
         ]
         super().__init__(layer_map=layer_map, canonizers=canonizers)
