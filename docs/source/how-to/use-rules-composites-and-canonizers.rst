@@ -337,6 +337,11 @@ Finally, there are abstract **Composites** which may be used to specify custom
   module types to rules, with a special mapping for the first layer
 * :py:class:`~zennit.composites.NameMapComposite`, which maps module names to
   rules
+* :py:class:`~zennit.composites.NameLayerMapComposite`, which maps module names to
+  rules, and if no matching module name found, maps module types to rules
+* :py:class:`~zennit.composites.MixedComposite`, which applies the mapping of a
+  list of composites, with matching order being equal to list order
+
 
 For example, the built-in :py:class:`~zennit.composites.EpsilonPlus` composite
 may be written like the following:
@@ -355,10 +360,12 @@ may be written like the following:
         (Convolution, ZPlus()),  # any convolutional layer
         (Linear, Epsilon(epsilon=1e-6))  # this is the dense Linear, not any
     ]
-    composite = LayerMapComposite(layer_map=layer_map)
+    composite_epsilon_plus = LayerMapComposite(layer_map=layer_map)
 
 Note that rules used in composites are only used as templates and copied for
 each layer they apply to using :py:func:`zennit.core.Hook.copy`.
+
+
 If we want to map the :py:class:`~zennit.rules.ZBox` rule to the first
 convolutional layer, we can use
 :py:class:`~zennit.composites.SpecialFirstLayerMapComposite` instead:
@@ -380,7 +387,7 @@ convolutional layer, we can use
         (AnyLinear, ZBox(low, high))
     ]
     # layer_map is used from the previous example
-    composite = SpecialFirstLayerMapComposite(
+    composite_special_first_layer = SpecialFirstLayerMapComposite(
         layer_map=layer_map, first_map=first_map
     )
 
@@ -410,16 +417,58 @@ mapping from module name to rule:
     print(list(model.named_modules()))
 
     # manually write a rule mapping:
-    composite = NameMapComposite([
+    name_map = [
         (['conv0'], ZBox(low, high)),
         (['conv1'], ZPlus()),
         (['linear0', 'linear1'], Epsilon()),
-    ])
+    ]
+    composite_name_map = NameMapComposite(name_map=name_map)
 
 Modules built using :py:class:`torch.nn.Sequential` without explicit names will have a
 number string as their name. Explicitly assigning a module to a parent module as
 an attribute will assign the attribute as the child module's name. Nested
 modules will have their names split by a dot ``.``.
+
+
+Composites can be further mixed either by using a
+:py:class:`~zennit.composites.NameLayerMapComposite` or a
+:py:class:`~zennit.composites.MixedComposite`:
+
+
+.. code-block:: python
+
+    from zennit.composites import NameLayerMapComposite
+
+    # matching order is same as list order
+    composite_name_layer_map = NameLayerMapComposite(
+        name_map=name_map, layer_map=layer_map,
+    )
+
+This creates a composite which will in turn create a
+:py:class:`~zennit.composites.NameMapComposite` and a
+:py:class:`~zennit.composites.LayerMapComposite` instance.
+The created composite will first try to match for a specific layer
+name by applying the mapping from the instantiated
+:py:class:`~zennit.composites.NameMapComposite`.
+If None are found, the matching process continues with the
+:py:class:`~zennit.composites.LayerMapComposite`.
+
+
+.. code-block:: python
+
+    from zennit.composites import MixedComposite
+
+    # matching order is same as list order
+    composites = [composite_name_map, composite_special_first_layer]
+    # create an instance from list of composites
+    composite_mixed = MixedComposite(composites=composites)
+
+This creates a composite which will first try to match for a specific layer
+name by applying the respective mappings of each composite in the given list.
+In the example above, if a layer name match is successful, it registers the
+hook from `composite_name_map`. If no matching name found, the matching process
+continues with `composite_special_first_layer`.
+
 
 .. _cooperative-layermapcomposites:
 

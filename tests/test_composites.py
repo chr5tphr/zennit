@@ -103,10 +103,102 @@ def test_composite_name_map_registered(name_map_composite, model_vision):
             for names, hook_template in name_map_composite.name_map:
                 if name in names:
                     if not check_hook_registered(child, hook_template):
-                        errors.append(
+                        errors.append((
                             '{} is first in name map for {}, but is not registered!',
                             (name, hook_template),
-                        )
+                        ))
+                    break
+
+    if not verify_no_hooks(model_vision):
+        errors.append(('Model has hooks registered after composite was removed!', ()))
+
+    assert not errors, 'Errors:\n  ' + '\n  '.join(f'[{n}] ' + msg.format(*arg) for n, (msg, arg) in enumerate(errors))
+
+
+def test_composite_mixed_registered(mixed_composite, model_vision):
+    '''Tests whether the constructed MixedComposites register and unregister their rules correctly.'''
+    errors = []
+
+    name_map_composite = mixed_composite.composites[0]
+    special_first_layer_map_composite = mixed_composite.composites[1]
+
+    try:
+        special_first_layer, special_first_template, special_first_dtype = next(
+            (child, hook_template, dtype)
+            for child, (dtype, hook_template) in product(
+                collect_leaves(model_vision), special_first_layer_map_composite.first_map
+            ) if isinstance(child, dtype)
+        )
+    except StopIteration:
+        special_first_layer = None
+        special_first_template = None
+
+    with mixed_composite.context(model_vision):
+        has_matched_first_layer = False
+        for name, child in model_vision.named_modules():
+            has_matched_name_map = False
+            for names, hook_template in name_map_composite.name_map:
+                if name in names:
+                    has_matched_name_map = True
+                    if not check_hook_registered(child, hook_template):
+                        errors.append((
+                            '{} is first in name map for {}, but is not registered!',
+                            (name, hook_template),
+                        ))
+                    break
+
+            if has_matched_name_map:
+                continue
+
+            if not has_matched_first_layer and child == special_first_layer:
+                has_matched_first_layer = True
+                if not check_hook_registered(child, special_first_template):
+                    errors.append((
+                        'Special first layer {} is first of {} but {} is not registered!',
+                        (special_first_layer, special_first_dtype, special_first_template)
+                    ))
+                continue
+
+            for dtype, hook_template in special_first_layer_map_composite.layer_map:
+                if isinstance(child, dtype):
+                    if not check_hook_registered(child, hook_template):
+                        errors.append((
+                            '{} is first of {} but {} is not registered!',
+                            (child, dtype, hook_template),
+                        ))
+                    break
+
+    if not verify_no_hooks(model_vision):
+        errors.append(('Model has hooks registered after composite was removed!', ()))
+
+    assert not errors, 'Errors:\n  ' + '\n  '.join(f'[{n}] ' + msg.format(*arg) for n, (msg, arg) in enumerate(errors))
+
+
+def test_composite_name_layer_map_registered(name_layer_map_composite, model_vision):
+    '''Tests whether the constructed NameLayerMapComposites register and unregister their rules correctly.'''
+    errors = []
+
+    name_map_composite = name_layer_map_composite.composites[0]
+    layer_map_composite = name_layer_map_composite.composites[1]
+
+    with name_layer_map_composite.context(model_vision):
+        for name, child in model_vision.named_modules():
+            for names, hook_template in name_map_composite.name_map:
+                if name in names:
+                    if not check_hook_registered(child, hook_template):
+                        errors.append((
+                            '{} is first in name map for {}, but is not registered!',
+                            (name, hook_template),
+                        ))
+                    break
+
+            for dtype, hook_template in layer_map_composite.layer_map:
+                if isinstance(child, dtype):
+                    if not check_hook_registered(child, hook_template):
+                        errors.append((
+                            '{} is first of {} but {} is not registered!',
+                            (child, dtype, hook_template),
+                        ))
                     break
 
     if not verify_no_hooks(model_vision):

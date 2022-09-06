@@ -13,8 +13,13 @@ from helpers import prodict, one_hot_max
 
 from zennit.attribution import identity
 from zennit.core import Composite, Hook
-from zennit.composites import COMPOSITES, NameMapComposite, LayerMapComposite, SpecialFirstLayerMapComposite
+from zennit.composites import COMPOSITES
 from zennit.composites import EpsilonGammaBox
+from zennit.composites import LayerMapComposite
+from zennit.composites import MixedComposite
+from zennit.composites import NameLayerMapComposite
+from zennit.composites import NameMapComposite
+from zennit.composites import SpecialFirstLayerMapComposite
 from zennit.types import Linear as AnyLinear, Activation
 
 
@@ -231,6 +236,24 @@ def name_map_composite(request, model_vision, layer_map_composite):
                 break
     name_map = [(tuple(value), key) for key, value in rule_map.items()]
     return NameMapComposite(name_map=name_map)
+
+
+@pytest.fixture(scope='session')
+def mixed_composite(request, model_vision, name_map_composite, special_first_layer_map_composite):
+    '''Fixture to create NameLayerMapComposites based on an explicit
+    NameMapComposite and SpecialFirstLayerMapComposites.'''
+    composites = [name_map_composite, special_first_layer_map_composite]
+    return MixedComposite(composites)
+
+
+@pytest.fixture(scope='session')
+def name_layer_map_composite(request, model_vision, name_map_composite, layer_map_composite):
+    '''Fixture to create NameLayerMapComposites based on an explicit
+    NameMapComposite and LayerMapComposite.'''
+    return NameLayerMapComposite(
+        name_map=name_map_composite.name_map,
+        layer_map=layer_map_composite.layer_map,
+    )
 
 
 @pytest.fixture(scope='session', params=[alexnet, vgg11, resnet18])
