@@ -1,3 +1,4 @@
+# This file is part of Zennit
 # Copyright (C) 2019-2021 Christopher J. Anders
 #
 # zennit/composites.py

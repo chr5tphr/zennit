@@ -450,7 +450,7 @@ This creates a composite which will in turn create a
 The created composite will first try to match for a specific layer
 name by applying the mapping from the instantiated
 :py:class:`~zennit.composites.NameMapComposite`.
-If None are found, the matching process continues with the
+If none are found, the matching process continues with the
 :py:class:`~zennit.composites.LayerMapComposite`.
 
 
@@ -466,8 +466,8 @@ If None are found, the matching process continues with the
 This creates a composite which will first try to match for a specific layer
 name by applying the respective mappings of each composite in the given list.
 In the example above, if a layer name match is successful, it registers the
-hook from `composite_name_map`. If no matching name found, the matching process
-continues with `composite_special_first_layer`.
+hook from ``composite_name_map``. If no matching name found, the matching process
+continues with ``composite_special_first_layer``.
 
 
 .. _cooperative-layermapcomposites:

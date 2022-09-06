@@ -119,8 +119,7 @@ def test_composite_mixed_registered(mixed_composite, model_vision):
     '''Tests whether the constructed MixedComposites register and unregister their rules correctly.'''
     errors = []
 
-    name_map_composite = mixed_composite.composites[0]
-    special_first_layer_map_composite = mixed_composite.composites[1]
+    name_map_composite, special_first_layer_map_composite = mixed_composite.composites
 
     try:
         special_first_layer, special_first_template, special_first_dtype = next(
@@ -178,19 +177,23 @@ def test_composite_name_layer_map_registered(name_layer_map_composite, model_vis
     '''Tests whether the constructed NameLayerMapComposites register and unregister their rules correctly.'''
     errors = []
 
-    name_map_composite = name_layer_map_composite.composites[0]
-    layer_map_composite = name_layer_map_composite.composites[1]
+    name_map_composite, layer_map_composite = name_layer_map_composite.composites
 
     with name_layer_map_composite.context(model_vision):
         for name, child in model_vision.named_modules():
             for names, hook_template in name_map_composite.name_map:
+                has_matched_name_map = False
                 if name in names:
+                    has_matched_name_map = True
                     if not check_hook_registered(child, hook_template):
                         errors.append((
                             '{} is first in name map for {}, but is not registered!',
                             (name, hook_template),
                         ))
                     break
+
+            if has_matched_name_map:
+                continue
 
             for dtype, hook_template in layer_map_composite.layer_map:
                 if isinstance(child, dtype):
