@@ -94,6 +94,7 @@ class MergeBatchNorm(Canonizer):
             key: getattr(self.batch_norm, key).data for key in ('weight', 'bias', 'running_mean', 'running_var')
         }
 
+        self.batch_norm_eps = batch_norm.eps
         self.merge_batch_norm(self.linears, self.batch_norm)
 
     def remove(self):
@@ -125,7 +126,6 @@ class MergeBatchNorm(Canonizer):
             Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and
             `eps`
         '''
-        self.batch_norm_eps = batch_norm.eps
         denominator = (batch_norm.running_var + batch_norm.eps) ** .5
         scale = (batch_norm.weight / denominator)
 
@@ -152,6 +152,144 @@ class MergeBatchNorm(Canonizer):
         batch_norm.bias.data = torch.zeros_like(batch_norm.bias.data)
         batch_norm.weight.data = torch.ones_like(batch_norm.weight.data)
         batch_norm.eps = 0.
+
+class MergeBatchNormtoRight(MergeBatchNorm):
+    @staticmethod
+    def convhook(module, x, y):
+        x = x[0]
+        bias_kernel = module.canonization_params["bias_kernel"]
+        pad1, pad2 = module.padding
+        padGap1, padGap2 = (
+        module.kernel_size[0] - 1 - module.padding[0], module.kernel_size[1] - 1 - module.padding[1])
+        # ASSUMING module.kernel_size IS ALWAYS STRICTLY GREATER THAN module.padding
+        if padGap1 > 0:
+            bias_kernel = bias_kernel[:, :, padGap1:-padGap1, :]
+            if pad1 > 0:
+                left_margin = bias_kernel[:, :, 0:pad1, :]
+                right_margin = bias_kernel[:, :, pad1 + 1:, :]
+                middle = bias_kernel[:, :, pad1:pad1 + 1, :].expand(1, bias_kernel.shape[1],
+                                                                    x.shape[2] - module.weight.shape[2] + 1,
+                                                                    bias_kernel.shape[-1])
+                bias_kernel = torch.cat((left_margin, middle, right_margin), dim=2)
+
+        if padGap2 > 0:
+            bias_kernel = bias_kernel[:, :, :, padGap2:-padGap2]
+            if pad2 > 0:
+                left_margin = bias_kernel[:, :, :, 0:pad2]
+                right_margin = bias_kernel[:, :, :, pad2 + 1:]
+                middle = bias_kernel[:, :, :, pad2:pad2 + 1].expand(1, bias_kernel.shape[1], bias_kernel.shape[-2],
+                                                                    x.shape[3] - module.weight.shape[3] + 1)
+                bias_kernel = torch.cat((left_margin, middle, right_margin), dim=3)
+
+        if module.stride[0] > 1 or module.stride[1] > 1:
+            indices1 = [i for i in range(0, bias_kernel.shape[2]) if i % module.stride[0] == 0]
+            indices2 = [i for i in range(0, bias_kernel.shape[3]) if i % module.stride[1] == 0]
+            bias_kernel = bias_kernel[:, :, indices1, :]
+            bias_kernel = bias_kernel[:, :, :, indices2]
+        ynew = y + bias_kernel
+        return ynew
+
+    def __init__(self):
+        super().__init__()
+        self.handles = []
+
+    def apply(self, root_module):
+        instances = []
+        last_leaf = None
+        for leaf in collect_leaves(root_module):
+            if isinstance(last_leaf, self.batch_norm_type) and isinstance(leaf, self.linear_type):
+                instance = self.copy()
+                instance.register((leaf,), last_leaf)
+                instances.append(instance)
+            last_leaf = leaf
+
+        return instances
+
+    def register(self, linears, batch_norm):
+        '''Store the parameters of the linear modules and the batch norm module and apply the merge.
+
+        Parameters
+        ----------
+        linear: list of obj:`torch.nn.Module`
+            List of linear layer with mandatory attributes `weight` and `bias`.
+        batch_norm: obj:`torch.nn.Module`
+            Batch Normalization module with mandatory attributes
+            `running_mean`, `running_var`, `weight`, `bias` and `eps`
+        '''
+        self.linears = linears
+        self.batch_norm = batch_norm
+
+        self.linear_params = [(linear.weight.data, getattr(linear.bias, 'data', None)) for linear in linears]
+
+        self.batch_norm_params = {
+            key: getattr(self.batch_norm, key).data for key in ('weight', 'bias', 'running_mean', 'running_var')
+        }
+        returned_handles = self.merge_batch_norm(self.linears, self.batch_norm)
+        if returned_handles != []:
+            self.handles = self.handles + returned_handles
+
+    def remove(self):
+        '''Undo the merge by reverting the parameters of both the linear and the batch norm modules to the state before
+        the merge.
+        '''
+        super().remove()
+        for h in self.handles:
+            h.remove()
+        for module in self.linears:
+            if isinstance(module,torch.nn.Conv2d):
+                if module.padding != (0, 0):
+                    delattr(module, "canonization_params")
+
+    def merge_batch_norm(self, modules, batch_norm):
+        self.batch_norm_eps = batch_norm.eps
+        return_handles = []
+        denominator = (batch_norm.running_var + batch_norm.eps) ** .5
+        scale = (batch_norm.weight / denominator)  # Weight of the batch norm layer when seen as a linear layer
+        shift = batch_norm.bias - batch_norm.running_mean * scale  # bias of the batch norm layer when seen as a linear layer
+
+        for module in modules:
+            original_weight = module.weight.data
+            if module.bias is None:
+                module.bias = torch.nn.Parameter(
+                    torch.zeros(module.out_channels, device=original_weight.device, dtype=original_weight.dtype)
+                )
+            original_bias = module.bias.data
+
+            if isinstance(module, ConvolutionTranspose):
+                index = (slice(None), *((None,) * (original_weight.ndim - 1)))
+            else:
+                index = (None, slice(None), *((None,) * (original_weight.ndim - 2)))
+
+            # merge batch_norm into linear layer to the right
+            module.weight.data = (original_weight * scale[index])
+
+            # module.bias.data = original_bias
+            if isinstance(module, torch.nn.Conv2d):
+                if module.padding == (0, 0):
+                    module.bias.data = (original_weight * shift[index]).sum(dim=[1, 2, 3]) + original_bias
+                else:
+                    bias_kernel = shift[index].expand(*(shift[index].shape[0:-2] + original_weight.shape[-2:]))
+                    temp_module_padding = (module.kernel_size[0] - 1, module.kernel_size[1] - 1)
+                    # temp_module.stride =
+                    temp_module = torch.nn.Conv2d(in_channels=module.in_channels, out_channels=module.out_channels,
+                                                  kernel_size=module.kernel_size, padding=temp_module_padding)
+                    temp_module.weight.data = original_weight
+                    temp_module.bias.data = original_bias
+                    bias_kernel = temp_module(bias_kernel).detach()
+
+                    module.canonization_params = {}
+                    module.canonization_params["bias_kernel"] = bias_kernel
+                    return_handles.append(module.register_forward_hook(SequentialMergeBatchNormtoRight.convhook))
+            elif isinstance(module,torch.nn.Linear):
+                module.bias.data = (original_weight * shift).sum(dim=1) + original_bias
+
+        # change batch_norm parameters to produce identity
+        batch_norm.running_mean.data = torch.zeros_like(batch_norm.running_mean.data)
+        batch_norm.running_var.data = torch.ones_like(batch_norm.running_var.data)
+        batch_norm.bias.data = torch.zeros_like(batch_norm.bias.data)
+        batch_norm.weight.data = torch.ones_like(batch_norm.weight.data)
+        batch_norm.eps = 0.
+        return return_handles
 
 
 class SequentialMergeBatchNorm(MergeBatchNorm):
