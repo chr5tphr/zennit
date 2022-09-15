@@ -327,6 +327,7 @@ class CompositeCanonizer(Canonizer):
         instances = []
         for canonizer in self.canonizers:
             instances += canonizer.apply(root_module)
+        instances.reverse()
         return instances
 
     def register(self):
