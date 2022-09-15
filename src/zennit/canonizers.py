@@ -185,9 +185,10 @@ class SequentialMergeBatchNorm(MergeBatchNorm):
         last_leaf = None
         for leaf in collect_leaves(root_module):
             if isinstance(last_leaf, self.linear_type) and isinstance(leaf, self.batch_norm_type):
-                instance = self.copy()
-                instance.register((last_leaf,), leaf)
-                instances.append(instance)
+                if last_leaf.weight.shape[0] == leaf.weight.shape[0]:
+                    instance = self.copy()
+                    instance.register((last_leaf,), leaf)
+                    instances.append(instance)
             last_leaf = leaf
 
         return instances
