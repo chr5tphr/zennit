@@ -70,7 +70,7 @@ class MergeBatchNorm(Canonizer):
         super().__init__()
         self.linears = None
         self.batch_norm = None
-
+        self.batch_norm_eps = None
         self.linear_params = None
         self.batch_norm_params = None
 
@@ -110,6 +110,8 @@ class MergeBatchNorm(Canonizer):
         for key, value in self.batch_norm_params.items():
             getattr(self.batch_norm, key).data = value
 
+        self.batch_norm.eps=self.batch_norm_eps
+
     @staticmethod
     def merge_batch_norm(modules, batch_norm):
         '''Update parameters of a linear layer to additionally include a Batch Normalization operation and update the
@@ -123,6 +125,7 @@ class MergeBatchNorm(Canonizer):
             Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and
             `eps`
         '''
+        self.batch_norm_eps = batch_norm.eps
         denominator = (batch_norm.running_var + batch_norm.eps) ** .5
         scale = (batch_norm.weight / denominator)
 
@@ -148,6 +151,7 @@ class MergeBatchNorm(Canonizer):
         batch_norm.running_var.data = torch.ones_like(batch_norm.running_var.data)
         batch_norm.bias.data = torch.zeros_like(batch_norm.bias.data)
         batch_norm.weight.data = torch.ones_like(batch_norm.weight.data)
+        batch_norm.eps = 0.
 
 
 class SequentialMergeBatchNorm(MergeBatchNorm):
