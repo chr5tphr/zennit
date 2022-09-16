@@ -20,8 +20,8 @@ from abc import ABCMeta, abstractmethod
 
 import torch
 
-from .core import collect_leaves
-from .types import Linear, BatchNorm, ConvolutionTranspose
+from core import collect_leaves
+from types import Linear, BatchNorm, ConvolutionTranspose
 
 
 class Canonizer(metaclass=ABCMeta):
@@ -160,26 +160,22 @@ class MergeBatchNormtoRight(MergeBatchNorm):
         bias_kernel = module.canonization_params["bias_kernel"]
         pad1, pad2 = module.padding
         padGap1, padGap2 = (
-        module.kernel_size[0] - 1 - module.padding[0], module.kernel_size[1] - 1 - module.padding[1])
+            module.kernel_size[0] - 1 - module.padding[0], module.kernel_size[1] - 1 - module.padding[1])
         # ASSUMING module.kernel_size IS ALWAYS STRICTLY GREATER THAN module.padding
-        if padGap1 > 0:
-            bias_kernel = bias_kernel[:, :, padGap1:-padGap1, :]
-            if pad1 > 0:
-                left_margin = bias_kernel[:, :, 0:pad1, :]
-                right_margin = bias_kernel[:, :, pad1 + 1:, :]
-                middle = bias_kernel[:, :, pad1:pad1 + 1, :].expand(1, bias_kernel.shape[1],
-                                                                    x.shape[2] - module.weight.shape[2] + 1,
-                                                                    bias_kernel.shape[-1])
-                bias_kernel = torch.cat((left_margin, middle, right_margin), dim=2)
+        if pad1 > 0:
+            left_margin = bias_kernel[:, :, 0:pad1, :]
+            right_margin = bias_kernel[:, :, pad1 + 1:, :]
+            middle = bias_kernel[:, :, pad1:pad1 + 1, :].expand(1, bias_kernel.shape[1],
+                                                                x.shape[2] - module.weight.shape[2] + 1,
+                                                                bias_kernel.shape[-1])
+            bias_kernel = torch.cat((left_margin, middle, right_margin), dim=2)
 
-        if padGap2 > 0:
-            bias_kernel = bias_kernel[:, :, :, padGap2:-padGap2]
-            if pad2 > 0:
-                left_margin = bias_kernel[:, :, :, 0:pad2]
-                right_margin = bias_kernel[:, :, :, pad2 + 1:]
-                middle = bias_kernel[:, :, :, pad2:pad2 + 1].expand(1, bias_kernel.shape[1], bias_kernel.shape[-2],
-                                                                    x.shape[3] - module.weight.shape[3] + 1)
-                bias_kernel = torch.cat((left_margin, middle, right_margin), dim=3)
+        if pad2 > 0:
+            left_margin = bias_kernel[:, :, :, 0:pad2]
+            right_margin = bias_kernel[:, :, :, pad2 + 1:]
+            middle = bias_kernel[:, :, :, pad2:pad2 + 1].expand(1, bias_kernel.shape[1], bias_kernel.shape[-2],
+                                                                x.shape[3] - module.weight.shape[3] + 1)
+            bias_kernel = torch.cat((left_margin, middle, right_margin), dim=3)
 
         if module.stride[0] > 1 or module.stride[1] > 1:
             indices1 = [i for i in range(0, bias_kernel.shape[2]) if i % module.stride[0] == 0]
@@ -218,6 +214,7 @@ class MergeBatchNormtoRight(MergeBatchNorm):
         '''
         self.linears = linears
         self.batch_norm = batch_norm
+        self.batch_norm_eps = self.batch_norm.eps
 
         self.linear_params = [(linear.weight.data, getattr(linear.bias, 'data', None)) for linear in linears]
 
@@ -241,7 +238,6 @@ class MergeBatchNormtoRight(MergeBatchNorm):
                     delattr(module, "canonization_params")
 
     def merge_batch_norm(self, modules, batch_norm):
-        self.batch_norm_eps = batch_norm.eps
         return_handles = []
         denominator = (batch_norm.running_var + batch_norm.eps) ** .5
         scale = (batch_norm.weight / denominator)  # Weight of the batch norm layer when seen as a linear layer
@@ -263,23 +259,24 @@ class MergeBatchNormtoRight(MergeBatchNorm):
             # merge batch_norm into linear layer to the right
             module.weight.data = (original_weight * scale[index])
 
-            # module.bias.data = original_bias
             if isinstance(module, torch.nn.Conv2d):
                 if module.padding == (0, 0):
                     module.bias.data = (original_weight * shift[index]).sum(dim=[1, 2, 3]) + original_bias
                 else:
+                    # We calculate a bias kernel, which is the output of the conv layer, without the bias, and with maximum padding,
+                    # applied to feature maps of the same size as the convolution kernel, with values given by the batch norm biases.
+                    # This produces a mostly constant feature map, which is not constant on the edges due to padding.
+                    # We then attach a forward hook to the conv layer to compute from this bias_kernel the feature map to be added
+                    # after the convolution due to the batch norm bias, depending on the given input's shape
                     bias_kernel = shift[index].expand(*(shift[index].shape[0:-2] + original_weight.shape[-2:]))
-                    temp_module_padding = (module.kernel_size[0] - 1, module.kernel_size[1] - 1)
-                    # temp_module.stride =
                     temp_module = torch.nn.Conv2d(in_channels=module.in_channels, out_channels=module.out_channels,
-                                                  kernel_size=module.kernel_size, padding=temp_module_padding)
+                                                  kernel_size=module.kernel_size, padding=module.padding,padding_mode=module.padding_mode, bias=False)
                     temp_module.weight.data = original_weight
-                    temp_module.bias.data = original_bias
                     bias_kernel = temp_module(bias_kernel).detach()
 
                     module.canonization_params = {}
                     module.canonization_params["bias_kernel"] = bias_kernel
-                    return_handles.append(module.register_forward_hook(SequentialMergeBatchNormtoRight.convhook))
+                    return_handles.append(module.register_forward_hook(MergeBatchNormtoRight.convhook))
             elif isinstance(module,torch.nn.Linear):
                 module.bias.data = (original_weight * shift).sum(dim=1) + original_bias
 
