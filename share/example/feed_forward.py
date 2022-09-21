@@ -27,6 +27,7 @@ ATTRIBUTORS = {
     'smoothgrad': SmoothGrad,
     'integrads': IntegratedGradients,
     'occlusion': Occlusion,
+    'inputxgrad': IntegratedGradients,
 }
 
 
@@ -182,6 +183,7 @@ def main(
     attributor_kwargs = {
         'smoothgrad': {'noise_level': 0.1, 'n_iter': 20},
         'integrads': {'n_iter': 20},
+        'inputxgrad': {'n_iter': 1},
         'occlusion': {'window': (56, 56), 'stride': (28, 28)},
     }.get(attributor_name, {})
 
