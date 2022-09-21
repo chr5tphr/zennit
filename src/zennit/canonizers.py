@@ -34,7 +34,7 @@ class Canonizer(metaclass=ABCMeta):
 
         Parameters
         ----------
-        root_module: obj:`torch.nn.Module`
+        root_module: :py:obj:`torch.nn.Module`
             Root module to which to apply the canonizers.
 
         Returns
@@ -79,9 +79,9 @@ class MergeBatchNorm(Canonizer):
 
         Parameters
         ----------
-        linear: list of obj:`torch.nn.Module`
+        linear: list of :py:obj:`torch.nn.Module`
             List of linear layer with mandatory attributes `weight` and `bias`.
-        batch_norm: obj:`torch.nn.Module`
+        batch_norm: :py:obj:`torch.nn.Module`
             Batch Normalization module with mandatory attributes
             `running_mean`, `running_var`, `weight`, `bias` and `eps`
         '''
@@ -117,9 +117,9 @@ class MergeBatchNorm(Canonizer):
 
         Parameters
         ----------
-        modules: list of obj:`torch.nn.Module`
+        modules: list of :py:obj:`torch.nn.Module`
             Linear layers with mandatory attributes `weight` and `bias`.
-        batch_norm: obj:`torch.nn.Module`
+        batch_norm: :py:obj:`torch.nn.Module`
             Batch Normalization module with mandatory attributes `running_mean`, `running_var`, `weight`, `bias` and
             `eps`
         '''
@@ -168,7 +168,7 @@ class SequentialMergeBatchNorm(MergeBatchNorm):
 
         Parameters
         ----------
-        root_module: obj:`torch.nn.Module`
+        root_module: :py:obj:`torch.nn.Module`
             A module of which the leaves will be searched and if a batch norm is found right after a linear layer, will
             be merged.
 
@@ -206,7 +206,7 @@ class NamedMergeBatchNorm(MergeBatchNorm):
 
         Parameters
         ----------
-        root_module: obj:`torch.nn.Module`
+        root_module: :py:obj:`torch.nn.Module`
             Root module for which underlying modules will be merged.
 
         Returns
@@ -249,12 +249,12 @@ class AttributeCanonizer(Canonizer):
 
         Parameters
         ----------
-        root_module: obj:`torch.nn.Module`
+        root_module: :py:obj:`torch.nn.Module`
             Root module for which underlying modules will have their attributes overloaded.
 
         Returns
         -------
-        instances : list of obj:`Canonizer`
+        instances : list of :py:obj:`Canonizer`
             The applied canonizer instances, which may be removed by calling `.remove`.
         '''
         instances = []
@@ -271,7 +271,7 @@ class AttributeCanonizer(Canonizer):
 
         Parameters
         ---------
-        module : obj:`torch.nn.Module`
+        module : :py:obj:`torch.nn.Module`
             The module of which the attributes will be overloaded.
         attributes : dict
             The attributes which to overload for the module.
@@ -294,7 +294,7 @@ class AttributeCanonizer(Canonizer):
 
         Returns
         -------
-        obj:`Canonizer`
+        :py:obj:`Canonizer`
             A copy of this Canonizer.
         '''
         return AttributeCanonizer(self.attribute_map)
@@ -305,7 +305,7 @@ class CompositeCanonizer(Canonizer):
 
     Parameters
     ----------
-    canonizers : list of obj:`Canonizer`
+    canonizers : list of :py:obj:`Canonizer`
         Canonizers of which to build a Composite of.
     '''
     def __init__(self, canonizers):
@@ -316,12 +316,12 @@ class CompositeCanonizer(Canonizer):
 
         Parameters
         ----------
-        root_module: obj:`torch.nn.Module`
+        root_module: :py:obj:`torch.nn.Module`
             Root module for which underlying modules will have canonizers applied.
 
         Returns
         -------
-        instances : list of obj:`Canonizer`
+        instances : list of :py:obj:`Canonizer`
             The applied canonizer instances, which may be removed by calling `.remove`.
         '''
         instances = []
