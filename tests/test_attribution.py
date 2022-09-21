@@ -103,7 +103,12 @@ def test_smooth_grad_distribution(data_simple, noise_level):
     sample_mean = sum(model.tensors) / len(model.tensors)
     sample_var = ((sum((tensor - sample_mean) ** 2 for tensor in model.tensors) / len(model.tensors))).mean(dims)
 
-    assert torch.allclose(sample_var, noise_var, rtol=0.2), 'SmoothGrad sample variance is too high!'
+    if noise_level > 0.:
+        std_ratio = (sample_var / noise_var) ** .5
+        assert (std_ratio < 1.5).all().item(), 'SmoothGrad sample variance is too high!'
+        assert (std_ratio > 0.667).all().item(), 'SmoothGrad sample variance is too low!'
+    else:
+        assert (sample_var < 1e-9).all().item(), 'SmoothGrad sample variance is too high!'
     assert torch.allclose(grad, torch.ones_like(data_simple)), 'SmoothGrad of identity is wrong!'
 
 
