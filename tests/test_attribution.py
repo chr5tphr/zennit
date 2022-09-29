@@ -88,7 +88,7 @@ def test_gradient_attributor_grad(data_simple):
 
 
 def test_gradient_attributor_output_fn_precedence(data_simple):
-    '''Test whether the gradient attributor attr_output at call is prefered when it is supplied at both initialization
+    '''Test whether the gradient attributor attr_output at call is preferred when it is supplied at both initialization
     and call.
     '''
     model = IdentityLogger()
@@ -137,7 +137,7 @@ def test_smooth_grad_distribution(data_simple, noise_level):
     with SmoothGrad(model=model, noise_level=noise_level, n_iter=n_iter, attr_output=torch.ones_like) as attributor:
         _, grad = attributor(data_simple)
 
-    assert len(model.tensors) == n_iter, 'SmootGrad iterations did not match n_iter!'
+    assert len(model.tensors) == n_iter, 'SmoothGrad iterations did not match n_iter!'
 
     sample_mean = sum(model.tensors) / len(model.tensors)
     sample_var = ((sum((tensor - sample_mean) ** 2 for tensor in model.tensors) / len(model.tensors))).mean(dims)

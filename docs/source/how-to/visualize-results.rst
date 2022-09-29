@@ -441,7 +441,7 @@ time. This is the way the built-in color maps are defined in
     img.show()
 
 :py:class:`~zennit.cmap.LazyColorMapCache` stores the specified source code for
-each key, and if accesed with `cmaps[key]`, it will either compile the
+each key, and if accessed with `cmaps[key]`, it will either compile the
 :py:class:`~zennit.cmap.ColorMap`, cache it if it has not been accessed
 before and return it, or it will return the previously cached
 :py:class:`~zennit.cmap.ColorMap`.

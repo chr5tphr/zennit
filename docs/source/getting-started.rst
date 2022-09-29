@@ -27,7 +27,7 @@ Zennit implements propagation-based attribution methods by overwriting the
 gradient of PyTorch modules in PyTorch's auto-differentiation engine. This means
 that Zennit will only work on models which are strictly implemented using
 PyTorch modules, including activation functions. The following demonstrates a
-setup to compute Layerwise Relevance Propagation (LRP) relevance for a simple
+setup to compute Layer-wise Relevance Propagation (LRP) relevance for a simple
 model and random data.
 
 .. code-block:: python
@@ -133,7 +133,7 @@ and :doc:`/how-to/write-custom-attributors`.
 Canonizers
 ^^^^^^^^^^
 
-For some modules and operations, Layerwise Relevance Propagation (LRP) is not
+For some modules and operations, Layer-wise Relevance Propagation (LRP) is not
 implementation-invariant, eg. ``BatchNorm -> Dense -> ReLU`` will be attributed
 differently than ``Dense -> BatchNorm -> ReLU``. Therefore, LRP needs a
 canonical form of the model, which is implemented in ``Canonizers``. These may
@@ -146,7 +146,7 @@ be simply supplied when instantiating a composite:
    from zennit.torchvision import VGGCanonizer
 
 
-   # instatiate the model
+   # instantiate the model
    model = vgg16()
    # create the canonizers
    canonizers = [VGGCanonizer()]
