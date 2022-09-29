@@ -3,7 +3,7 @@ Writing Custom Canonizers
 =========================
 
 **Canonizers** are used to temporarily transform models into a canonical form to
-mitigate the lack of implementation invariance of methods Layerwise Relevance
+mitigate the lack of implementation invariance of methods Layer-wise Relevance
 Propagation (LRP). A general introduction to **Canonizers** can be found here:
 :ref:`use-canonizers`.
 
@@ -110,7 +110,7 @@ the ReLU activations in a model with Softplus activations:
             self.relu_children = relu_children
             for name, _ in relu_children:
                 # set each of the attributes corresponding to the ReLU to a new
-                # instance of toch.nn.Softplus
+                # instance of torch.nn.Softplus
                 setattr(module, name, torch.nn.Softplus(beta=self.beta))
 
         def remove(self):

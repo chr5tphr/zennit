@@ -45,7 +45,7 @@ def main(source_file, output_file, strategy, source_cmap, source_level, invert, 
     matchpal = palette(source_cmap, source_level)
 
     if strategy == 'intensity':
-        # matching based on the source image intensity/ brigthness
+        # matching based on the source image intensity/ brightness
         values = source.astype(float).mean(2)
     elif strategy == 'nearest':
         # match by finding the neareast centroids in a source colormap

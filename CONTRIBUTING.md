@@ -47,7 +47,7 @@ The documentation uses [Sphinx](https://www.sphinx-doc.org). It can be built at
 `docs/build` using the respective Tox environment with `tox -e docs`. To rebuild the full
 documentation, `tox -e docs -- -aE` can be used.
 
-The API-documentation is generated from the numpycodestyle docstring of respective modules/classes/functions.
+The API-documentation is generated from the numpydoc-style docstring of respective modules/classes/functions.
 
 ### Tutorials
 Tutorials are written as Jupyter notebooks in order to execute them using

@@ -2,7 +2,7 @@
 Zennit Documentation
 ====================
 
-Zennit (Zennit Explains Neural Networks in Torch) is a python framework using PyTorch to compute local attributions in the sense of eXplainable AI (XAI) with a focus on Layerwise Relevance Progagation.
+Zennit (Zennit Explains Neural Networks in Torch) is a python framework using PyTorch to compute local attributions in the sense of eXplainable AI (XAI) with a focus on Layer-wise Relevance Propagation.
 It works by defining *rules* which are used to overwrite the gradient of PyTorch modules in PyTorch's auto-differentiation engine.
 Rules are mapped to layers with *composites*, which contain directions to compute the attributions of a full model, which maps rules to modules based on their properties and context.
 

@@ -204,7 +204,7 @@ class Attributor(metaclass=ABCMeta):
 
 class Gradient(Attributor):
     '''The Gradient Attributor. The result is the product of the attribution output and the (possibly modified)
-    jacobian. With a composite, i.e. `EpsilonGammaBox`, this will compute the Layerwise Relevance Propagation
+    jacobian. With a composite, i.e. `EpsilonGammaBox`, this will compute the Layer-wise Relevance Propagation
     attribution values.
 
     Parameters

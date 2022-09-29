@@ -117,7 +117,7 @@ def test_attribute_canonizer(module_linear, data_linear):
 
 
 def test_composite_canonizer():
-    '''Test whether CompositeCanonizer correctly combines two AttributCanonizer canonizers.'''
+    '''Test whether CompositeCanonizer correctly combines two AttributeCanonizer canonizers.'''
     module_vanilla = torch.nn.Module()
     model = torch.nn.Sequential(module_vanilla)
 
@@ -138,7 +138,7 @@ def test_composite_canonizer():
 
 
 def test_base_canonizer_cooperative_apply():
-    '''Test wheter Canonizer's apply method is cooperative.'''
+    '''Test whether Canonizer's apply method is cooperative.'''
 
     class DummyCanonizer(Canonizer):
         '''Class to test Canonizer's cooperative apply.'''

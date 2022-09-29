@@ -162,7 +162,7 @@ def expand(tensor, shape, cut_batch_dim=False):
         # append singleton dimensions if tensor has fewer dimensions, and the existing ones match with shape
         tensor = tensor[(...,) + (None,) * (len(shape) - len(tensor.shape))]
     if tensor.ndim == len(shape):
-        # if the dims match completely (lenghts match and zipped match), expand normally
+        # if the dims match completely (lengths match and zipped match), expand normally
         if all(left in (1, right) for left, right in zip(tensor.shape, shape)):
             return tensor.expand(shape)
         # if `cut_batch_dim` and dims match except first, which is larger than shape, the the first dim and expand
@@ -370,7 +370,7 @@ class Identity(torch.autograd.Function):
 
 
 class Hook:
-    '''Base class for hooks to be used to compute layerwise attributions.'''
+    '''Base class for hooks to be used to compute layer-wise attributions.'''
     def __init__(self):
         self.stored_tensors = {}
         self.active = True
