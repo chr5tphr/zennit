@@ -159,8 +159,6 @@ class MergeBatchNormtoRight(MergeBatchNorm):
         x = x[0]
         bias_kernel = module.canonization_params["bias_kernel"]
         pad1, pad2 = module.padding
-        padGap1, padGap2 = (
-            module.kernel_size[0] - 1 - module.padding[0], module.kernel_size[1] - 1 - module.padding[1])
         # ASSUMING module.kernel_size IS ALWAYS STRICTLY GREATER THAN module.padding
         if pad1 > 0:
             left_margin = bias_kernel[:, :, 0:pad1, :]
@@ -475,3 +473,142 @@ class CompositeCanonizer(Canonizer):
 
     def remove(self):
         '''Remove this Canonizer. Nothing to do for a CompositeCanonizer.'''
+
+
+
+
+class DenseNetAdaptiveAvgPoolCanonizer(AttributeCanonizer):
+    '''Canonizer specifically for AdaptiveAvgPooling2d layers at the end of torchvision.model densenet models.'''
+
+    def __init__(self):
+        super().__init__(self._attribute_map)
+
+    @classmethod
+    def _attribute_map(cls, name, module):
+
+        if isinstance(module, DenseNet):
+            attributes = {
+                'forward': cls.forward.__get__(module),
+            }
+            return attributes
+        return None
+
+    def copy(self):
+        '''Copy this Canonizer.
+
+        Returns
+        -------
+        obj:`Canonizer`
+            A copy of this Canonizer.
+        '''
+        return DenseNetAdaptiveAvgPoolCanonizer()
+
+    def register(self, module, attributes):
+        module.features.add_module('final_relu', ReLU(inplace=True))
+        module.features.add_module('adaptive_avg_pool2d', AdaptiveAvgPool2d((1, 1)))
+        super(DenseNetAdaptiveAvgPoolCanonizer, self).register(module, attributes)
+
+    def remove(self):
+        '''Remove the overloaded attributes. Note that functions are descriptors, and therefore not direct attributes
+        of instance, which is why deleting instance attributes with the same name reverts them to the original
+        function.
+        '''
+        self.module.features = Sequential(*list(self.module.features.children())[:-2])
+        for key in self.attribute_keys:
+            delattr(self.module, key)
+
+    def forward(self, x):
+        out = self.features(x)
+        out = torch.flatten(out, 1)
+        out = self.classifier(out)
+        return out
+
+
+class ThreshReLUMergeBatchNorm(MergeBatchNormtoRight):
+    @staticmethod
+    def prehook(module, x):
+        module.canonization_params["original_x"] = x[0].clone()
+
+    @staticmethod
+    def fwdhook(module, x, y):
+        x = module.canonization_params["original_x"]
+        index = (None, slice(None), *((None,) * (module.canonization_params['weights'].ndim + 1)))
+        y = module.canonization_params['weights'][index] * x + module.canonization_params['biases'][index]
+        baseline_vals = -1. * (module.canonization_params['biases'] / module.canonization_params['weights'])[index]
+        return torch.where(y > 0, x, baseline_vals)
+
+    def __init__(self):
+        super().__init__()
+        self.relu = None
+
+    def apply(self, root_module):
+        instances = []
+        oldest_leaf = None
+        old_leaf = None
+        mid_leaf = None
+        for leaf in collect_leaves(root_module):
+            if isinstance(old_leaf, self.batch_norm_type) and isinstance(mid_leaf, ReLU) and isinstance(leaf,
+                                                                                                        self.linear_type):
+                instance = self.copy()
+                instance.register((leaf,), old_leaf, mid_leaf)
+                instances.append(instance)
+            elif isinstance(oldest_leaf, self.batch_norm_type) and isinstance(old_leaf, ReLU) and isinstance(mid_leaf,
+                                                                                                             AdaptiveAvgPool2d) and isinstance(
+                leaf, self.linear_type):
+                instance = self.copy()
+                instance.register((leaf,), oldest_leaf, old_leaf)
+                instances.append(instance)
+            oldest_leaf = old_leaf
+            old_leaf = mid_leaf
+            mid_leaf = leaf
+
+        return instances
+
+    def register(self, linears, batch_norm, relu):
+        '''Store the parameters of the linear modules and the batch norm module and apply the merge.
+
+        Parameters
+        ----------
+        linear: list of obj:`torch.nn.Module`
+            List of linear layer with mandatory attributes `weight` and `bias`.
+        batch_norm: obj:`torch.nn.Module`
+            Batch Normalization module with mandatory attributes
+            `running_mean`, `running_var`, `weight`, `bias` and `eps`
+        '''
+        self.relu = relu
+
+        denominator = (batch_norm.running_var + batch_norm.eps) ** .5
+        scale = (batch_norm.weight / denominator)  # Weight of the batch norm layer when seen as a linear layer
+        shift = batch_norm.bias - batch_norm.running_mean * scale  # bias of the batch norm layer when seen as a linear layer
+        self.relu.canonization_params = {}
+        self.relu.canonization_params['weights'] = scale
+        self.relu.canonization_params['biases'] = shift
+
+        super().register(linears,batch_norm)
+        self.handles.append(self.relu.register_forward_pre_hook(ThreshReLUMergeBatchNorm.prehook))
+        self.handles.append(self.relu.register_forward_hook(ThreshReLUMergeBatchNorm.fwdhook))
+
+    def remove(self):
+        '''Undo the merge by reverting the parameters of both the linear and the batch norm modules to the state before
+        the merge.
+        '''
+        super().remove()
+        delattr(self.relu, "canonization_params")
+
+
+class SequentialThreshCanonizer(CorrectCompositeCanonizer):
+    def __init__(self):
+        super().__init__((
+            DenseNetAdaptiveAvgPoolCanonizer(),
+            CorrectSequentialMergeBatchNorm(),
+            ThreshReLUMergeBatchNorm(),
+        ))
+
+
+class ThreshSequentialCanonizer(CorrectCompositeCanonizer):
+    def __init__(self):
+        super().__init__((
+            DenseNetAdaptiveAvgPoolCanonizer(),
+            ThreshReLUMergeBatchNorm(),
+            CorrectSequentialMergeBatchNorm(),
+        ))
