@@ -603,20 +603,3 @@ class ThreshReLUMergeBatchNorm(MergeBatchNormtoRight):
         super().remove()
         delattr(self.relu, "canonization_params")
 
-
-class SequentialThreshCanonizer(CompositeCanonizer):
-    def __init__(self):
-        super().__init__((
-            DenseNetAdaptiveAvgPoolCanonizer(),
-            SequentialMergeBatchNorm(),
-            ThreshReLUMergeBatchNorm(),
-        ))
-
-
-class ThreshSequentialCanonizer(CompositeCanonizer):
-    def __init__(self):
-        super().__init__((
-            DenseNetAdaptiveAvgPoolCanonizer(),
-            ThreshReLUMergeBatchNorm(),
-            SequentialMergeBatchNorm(),
-        ))

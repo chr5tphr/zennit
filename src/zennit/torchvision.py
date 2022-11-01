@@ -147,3 +147,22 @@ class ResNetCanonizer(CompositeCanonizer):
             ResNetBottleneckCanonizer(),
             ResNetBasicBlockCanonizer(),
         ))
+
+
+
+class DenseNetSeqThreshCanonizer(CompositeCanonizer):
+    def __init__(self):
+        super().__init__((
+            DenseNetAdaptiveAvgPoolCanonizer(),
+            SequentialMergeBatchNorm(),
+            ThreshReLUMergeBatchNorm(),
+        ))
+
+
+class DenseNetThreshSeqCanonizer(CompositeCanonizer):
+    def __init__(self):
+        super().__init__((
+            DenseNetAdaptiveAvgPoolCanonizer(),
+            ThreshReLUMergeBatchNorm(),
+            SequentialMergeBatchNorm(),
+        ))
