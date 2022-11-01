@@ -20,9 +20,8 @@ from abc import ABCMeta, abstractmethod
 
 import torch
 
-from core import collect_leaves
-from types import Linear, BatchNorm, ConvolutionTranspose
-
+from .core import collect_leaves
+from .types import Linear, BatchNorm, ConvolutionTranspose
 
 class Canonizer(metaclass=ABCMeta):
     '''Canonizer Base class.
@@ -165,16 +164,23 @@ class MergeBatchNormtoRight(MergeBatchNorm):
         if pad1 > 0:
             left_margin = bias_kernel[:, :, 0:pad1, :]
             right_margin = bias_kernel[:, :, pad1 + 1:, :]
-            middle = bias_kernel[:, :, pad1:pad1 + 1, :].expand(1, bias_kernel.shape[1],
-                                                                x.shape[2] - module.weight.shape[2] + 1,
-                                                                bias_kernel.shape[-1])
+            middle = bias_kernel[:, :, pad1:pad1 + 1, :].expand(
+                1,
+                bias_kernel.shape[1],
+                x.shape[2] - module.weight.shape[2] + 1,
+                bias_kernel.shape[-1]
+            )
             bias_kernel = torch.cat((left_margin, middle, right_margin), dim=2)
 
         if pad2 > 0:
             left_margin = bias_kernel[:, :, :, 0:pad2]
             right_margin = bias_kernel[:, :, :, pad2 + 1:]
-            middle = bias_kernel[:, :, :, pad2:pad2 + 1].expand(1, bias_kernel.shape[1], bias_kernel.shape[-2],
-                                                                x.shape[3] - module.weight.shape[3] + 1)
+            middle = bias_kernel[:, :, :, pad2:pad2 + 1].expand(
+                1,
+                bias_kernel.shape[1],
+                bias_kernel.shape[-2],
+                x.shape[3] - module.weight.shape[3] + 1
+            )
             bias_kernel = torch.cat((left_margin, middle, right_margin), dim=3)
 
         if module.stride[0] > 1 or module.stride[1] > 1:
