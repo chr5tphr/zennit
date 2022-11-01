@@ -57,6 +57,7 @@ class Canonizer(metaclass=ABCMeta):
         return self.__class__()
 
 
+
 class MergeBatchNorm(Canonizer):
     '''Abstract Canonizer to merge the parameters of batch norms into linear modules.'''
     linear_type = (
@@ -152,6 +153,7 @@ class MergeBatchNorm(Canonizer):
         batch_norm.bias.data = torch.zeros_like(batch_norm.bias.data)
         batch_norm.weight.data = torch.ones_like(batch_norm.weight.data)
         batch_norm.eps = 0.
+
 
 class MergeBatchNormtoRight(MergeBatchNorm):
     @staticmethod
@@ -596,19 +598,19 @@ class ThreshReLUMergeBatchNorm(MergeBatchNormtoRight):
         delattr(self.relu, "canonization_params")
 
 
-class SequentialThreshCanonizer(CorrectCompositeCanonizer):
+class SequentialThreshCanonizer(CompositeCanonizer):
     def __init__(self):
         super().__init__((
             DenseNetAdaptiveAvgPoolCanonizer(),
-            CorrectSequentialMergeBatchNorm(),
+            SequentialMergeBatchNorm(),
             ThreshReLUMergeBatchNorm(),
         ))
 
 
-class ThreshSequentialCanonizer(CorrectCompositeCanonizer):
+class ThreshSequentialCanonizer(CompositeCanonizer):
     def __init__(self):
         super().__init__((
             DenseNetAdaptiveAvgPoolCanonizer(),
             ThreshReLUMergeBatchNorm(),
-            CorrectSequentialMergeBatchNorm(),
+            SequentialMergeBatchNorm(),
         ))
