@@ -494,6 +494,6 @@ class BetaSmooth(LayerMapComposite):
             layer_map = []
 
         layer_map = layer_map + [
-            (torch.nn.ReLU, ReLUBetaSmooth()),
+            (torch.nn.ReLU, ReLUBetaSmooth(beta_smooth=beta_smooth)),
         ]
         super().__init__(layer_map=layer_map, canonizers=canonizers)
