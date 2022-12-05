@@ -355,8 +355,7 @@ class MergeBatchNormtoRight(MergeBatchNorm):
 
 
 class ThreshReLUMergeBatchNorm(MergeBatchNormtoRight):
-    '''
-    Canonizer to canonize BatchNorm -> ReLU -> Linear chains, modifying the ReLU as explained in
+    '''Canonizer to canonize BatchNorm -> ReLU -> Linear chains, modifying the ReLU as explained in
     https://github.com/AlexBinder/LRP_Pytorch_Resnets_Densenet/blob/master/canonization_doc.pdf
     '''
 
@@ -415,6 +414,8 @@ class ThreshReLUMergeBatchNorm(MergeBatchNormtoRight):
         batch_norm: obj:`torch.nn.Module`
             Batch Normalization module with mandatory attributes
             `running_mean`, `running_var`, `weight`, `bias` and `eps`
+        relu: obj:`torch.nn.Module`
+            The activation unit between the Batch Normalization and Linear modules.
         '''
         self.relu = relu
 
