@@ -271,7 +271,7 @@ class Gradient(Attributor):
         ----------
         input: :py:obj:`torch.Tensor`
             Input for the model, and wrt. compute the attribution.
-        attr_output: :py:obj:`torch.Tensor` or callable, optional
+        attr_output_fn: :py:obj:`torch.Tensor` or callable
             The output attribution function of the model's output.
 
         Returns
