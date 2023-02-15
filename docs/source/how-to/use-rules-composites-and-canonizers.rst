@@ -186,7 +186,7 @@ All available **Composites** can be found in :py:mod:`zennit.composites`.
 Built-In Composites
 ^^^^^^^^^^^^^^^^^^^
 
-Some built-in composites implement rule-mappings needed for some common
+Some built-in Composites implement rule-mappings needed for some common
 attribution methods, some of which are
 
 * :py:class:`~zennit.composites.EpsilonPlus`, which uses
@@ -338,12 +338,11 @@ Finally, there are abstract **Composites** which may be used to specify custom
 * :py:class:`~zennit.composites.NameMapComposite`, which maps module names to
   rules
 * :py:class:`~zennit.composites.NameLayerMapComposite`, which maps module names to
-  rules, and if no matching module name found, maps module types to rules
-* :py:class:`~zennit.composites.MixedComposite`, which applies the mapping of a
-  list of composites, with matching order being equal to list order
+  rules, and if no matching module name is found, maps module types to rules
+* :py:class:`~zennit.composites.MixedComposite`, which combines a list of
+  Composites sequentially by finding the first matching rule (see :ref:`mixed-composites`)
 
-
-For example, the built-in :py:class:`~zennit.composites.EpsilonPlus` composite
+For example, the built-in :py:class:`~zennit.composites.EpsilonPlus` Composite
 may be written like the following:
 
 .. code-block:: python
@@ -362,7 +361,7 @@ may be written like the following:
     ]
     composite_epsilon_plus = LayerMapComposite(layer_map=layer_map)
 
-Note that rules used in composites are only used as templates and copied for
+Note that rules used in Composites are only used as templates and copied for
 each layer they apply to using :py:func:`zennit.core.Hook.copy`.
 
 
@@ -377,10 +376,8 @@ convolutional layer, we can use
     # abstract base class to describe convolutions + dense linear layers
     from zennit.types import Linear as AnyLinear
 
-    # shape of our data
-    shape = (1, 3, 32, 32)
-    low = torch.full(shape, -3)
-    high = torch.full(shape, 3)
+    low = -3.
+    high = 3.
     # the first map is only used once, to the first module which applies to the
     # map, i.e. here the first layer of type AnyLinear
     first_map = [
@@ -392,7 +389,7 @@ convolutional layer, we can use
     )
 
 
-If a composite is made to apply for a single model, a
+If a Composite is made to apply for a single model, a
 :py:class:`~zennit.composites.NameMapComposite` can provide a transparent
 mapping from module name to rule:
 
@@ -429,46 +426,97 @@ number string as their name. Explicitly assigning a module to a parent module as
 an attribute will assign the attribute as the child module's name. Nested
 modules will have their names split by a dot ``.``.
 
+To assign rules explicitly using their respective names with a fall-back based
+on the layer type, :py:class:`~zennit.composites.NameLayerMapComposite` can be
+used to combine the functionality of
+:py:class:`~zennit.composites.NameMapComposite` and
+:py:class:`~zennit.composites.LayerMapComposite`.
 
-Composites can be further mixed either by using a
-:py:class:`~zennit.composites.NameLayerMapComposite` or a
-:py:class:`~zennit.composites.MixedComposite`:
-
+This can be especially useful to change rules only for specific layers, e.g.
 
 .. code-block:: python
 
     from zennit.composites import NameLayerMapComposite
 
-    # matching order is same as list order
     composite_name_layer_map = NameLayerMapComposite(
-        name_map=name_map, layer_map=layer_map,
+        name_map=[
+            (['conv0'], ZBox(low, high)),
+        ],
+        layer_map=[
+            (Activation, Pass()),
+            (Convolution, ZPlus()),
+            (Linear, Epsilon(epsilon=1e-6))
+        ],
     )
 
-This creates a composite which will in turn create a
+Note that the mapping in ``name_map`` has precedence over the mapping in
+``layer_map``.
+
+.. _mixed-composites:
+
+Mixed Composites
+^^^^^^^^^^^^^^^^
+
+:py:class:`~zennit.composites.MixedComposite` sequentially combines Composites
+and will return the first matching rule in the supplied list of Composites.
+
+Internally, :py:class:`~zennit.composites.NameLayerMapComposite` is implemented
+as a :py:class:`~zennit.composites.MixedComposite` composed of a
 :py:class:`~zennit.composites.NameMapComposite` and a
-:py:class:`~zennit.composites.LayerMapComposite` instance.
-The created composite will first try to match for a specific layer
-name by applying the mapping from the instantiated
-:py:class:`~zennit.composites.NameMapComposite`.
-If none are found, the matching process continues with the
 :py:class:`~zennit.composites.LayerMapComposite`.
 
+Instances of :py:class:`~zennit.composites.NameLayerMapComposite` will first
+try to match for a specific layer name by applying the mapping from the
+instantiated :py:class:`~zennit.composites.NameMapComposite`. If none are
+found, the matching process continues with the
+:py:class:`~zennit.composites.LayerMapComposite`.
+
+We can implement the same behaviour explicitly using
 
 .. code-block:: python
 
     from zennit.composites import MixedComposite
 
-    # matching order is same as list order
-    composites = [composite_name_map, composite_special_first_layer]
-    # create an instance from list of composites
-    composite_mixed = MixedComposite(composites=composites)
+    # pass a list of composites to MixedComposite
+    # composites are matched by the list order
+    composite_mixed = MixedComposite([
+        # first composite, highest priority
+        NameMapComposite([
+            (['conv0'], ZBox(-3.0, 3.0)),
+        ]),
+        # second composite, only used if the previous composite(s) do not match
+        LayerMapComposite([
+            (Activation, Pass()),
+            (Convolution, ZPlus()),
+            (Linear, Epsilon(epsilon=1e-6))
+        ]),
+    ])
 
-This creates a composite which will first try to match for a specific layer
-name by applying the respective mappings of each composite in the given list.
-In the example above, if a layer name match is successful, it registers the
-hook from ``composite_name_map``. If no matching name found, the matching process
-continues with ``composite_special_first_layer``.
+The list of Composites supplied to
+:py:class:`~zennit.composites.MixedComposite` is order sensitive. When matching
+for a layer, the list composites will be traversed in order and and the first
+matching rule will be returned.
 
+This may also be used to create specific higher-priority mappings to customize
+built-in Composites
+
+.. code-block:: python
+
+    composite_mixed = MixedComposite([
+        # first composite, matches only for first-layer convolution
+        SpecialFirstLayerMapComposite(
+            # emtpy layer map does not match any layer
+            layer_map=[],
+            first_map=[
+                (Convolution, ZBox(-3.0, 3.0)),
+            ]
+        ),
+        # built-in composite used if the first composite does not match
+        EpsilonPlus()
+    ])
+
+A more convenient way to customize built-in Composites by adding layer mappings
+can be achieved by using :ref:`cooperative-layermapcomposites`.
 
 .. _cooperative-layermapcomposites:
 
@@ -512,7 +560,7 @@ the BatchNorm contributions, we can write:
     )
 
 
-To create custom composites following more complex patterns, see
+To create custom Composites following more complex patterns, see
 :doc:`/how-to/write-custom-composites`.
 
 
