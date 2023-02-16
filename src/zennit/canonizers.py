@@ -124,7 +124,7 @@ class MergeBatchNorm(Canonizer):
             `eps`
         '''
         denominator = (batch_norm.running_var + batch_norm.eps) ** .5
-        scale = (batch_norm.weight / denominator)
+        scale = batch_norm.weight / denominator
 
         for module in modules:
             original_weight = module.weight.data
@@ -140,7 +140,7 @@ class MergeBatchNorm(Canonizer):
                 index = (slice(None), *((None,) * (original_weight.ndim - 1)))
 
             # merge batch_norm into linear layer
-            module.weight.data = (original_weight * scale[index])
+            module.weight.data = original_weight * scale[index]
             module.bias.data = (original_bias - batch_norm.running_mean) * scale + batch_norm.bias
 
         # change batch_norm parameters to produce identity
