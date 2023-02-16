@@ -55,7 +55,8 @@ class LayerMapComposite(Composite):
         Returns
         -------
         obj:`Hook` or None
-            The hook found with the module type in the given layer map, or None if no applicable hook was found.
+            The hook found with the module type in the given layer map,
+            or None if no applicable hook was found.
         '''
         return next((hook for types, hook in self.layer_map if isinstance(module, types)), None)
 
@@ -92,8 +93,9 @@ class SpecialFirstLayerMapComposite(LayerMapComposite):
         Returns
         -------
         obj:`Hook` or None
-            The hook found with the module type in the given layer map, in the first layer map if this was the first
-            layer, or None if no applicable hook was found.
+            The hook found with the module type in the given layer map,
+            in the first layer map if this was the first layer,
+            or None if no applicable hook was found.
         '''
         if not ctx.get('first_layer_visited', False):
             for types, hook in self.first_map:
@@ -105,7 +107,7 @@ class SpecialFirstLayerMapComposite(LayerMapComposite):
 
 
 class NameMapComposite(Composite):
-    '''A Composite for which hooks are specified by a mapping from module types to hooks.
+    '''A Composite for which hooks are specified by a mapping from module names to hooks.
 
     Parameters
     ----------
@@ -134,9 +136,84 @@ class NameMapComposite(Composite):
         Returns
         -------
         obj:`Hook` or None
-            The hook found with the module type in the given name map, or None if no applicable hook was found.
+            The hook found with the module name in the given name map, or None if no applicable
+            hook was found.
         '''
         return next((hook for names, hook in self.name_map if name in names), None)
+
+
+class MixedComposite(Composite):
+    '''A Composite for which hooks are specified by a list of composites.
+
+    Each composite defines a mapping from layer property to a specific Hook.
+    The list order of composites defines their matching order.
+
+    Parameters
+    ----------
+    composites: `list[Composite]`
+        A list of Composites. The list order of composites defines their matching order.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
+    '''
+    def __init__(self, composites, canonizers=None):
+        if canonizers is None:
+            canonizers = []
+        self.composites = composites
+        super().__init__(
+            module_map=self.mapping,
+            canonizers=sum([composite.canonizers for composite in composites], canonizers)
+        )
+
+    def mapping(self, ctx, name, module):
+        '''Get the appropriate hook given a list of composites.
+
+        Parameters
+        ----------
+        ctx: dict
+            A context dictionary to keep track of previously registered hooks.
+        name: str
+            Name of the module.
+        module: obj:`torch.nn.Module`
+            Instance of the module to find a hook for.
+
+        Returns
+        -------
+        obj:`Hook` or None
+            The hook found by the first match in the composite list,
+            or None if no applicable hook was found.
+        '''
+        # create a context for each of the sub-composites if ctx is empty
+        if not ctx:
+            ctx.update({composite: {} for composite in self.composites})
+
+        # create list of hooks by evaluating module maps of all given composites
+        hooks = [composite.module_map(ctx[composite], name, module) for composite in self.composites]
+
+        # return first hook that is not None, if there isn't any, return None
+        return next((hook for hook in hooks if hook is not None), None)
+
+
+class NameLayerMapComposite(MixedComposite):
+    '''A Composite for which hooks are specified by both a mapping from
+    module names and module types to hooks.
+
+    This implicitly creates instances of NameMapComposite and LayerMapComposite.
+    The layer-name mapping will be matched before the layer-type mapping.
+
+    Parameters
+    ----------
+    name_map: `list[tuple[tuple[str, ...], Hook]]`
+        A mapping as a list of tuples, with a tuple of applicable module names and a Hook.
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]], optional
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
+    '''
+    def __init__(self, name_map=None, layer_map=None, canonizers=None):
+        super().__init__(composites=[
+            NameMapComposite(name_map=name_map),
+            LayerMapComposite(layer_map=layer_map),
+        ], canonizers=canonizers)
 
 
 COMPOSITES = {}
