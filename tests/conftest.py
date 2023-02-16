@@ -58,10 +58,10 @@ def rng(request):
     scope='session',
     params=[
         (torch.nn.ReLU, {}),
-        (torch.nn.Softmax, dict(dim=1)),
+        (torch.nn.Softmax, {'dim': 1}),
         (torch.nn.Tanh, {}),
         (torch.nn.Sigmoid, {}),
-        (torch.nn.Softplus, dict(beta=1)),
+        (torch.nn.Softplus, {'beta': 1}),
     ],
     ids=lambda param: param[0].__name__
 )
