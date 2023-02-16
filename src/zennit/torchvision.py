@@ -147,3 +147,68 @@ class ResNetCanonizer(CompositeCanonizer):
             ResNetBottleneckCanonizer(),
             ResNetBasicBlockCanonizer(),
         ))
+
+
+class DenseNetAdaptiveAvgPoolCanonizer(AttributeCanonizer):
+    '''Canonizer specifically for AdaptiveAvgPooling2d layers at the end of torchvision.model densenet models.'''
+
+    def __init__(self):
+        super().__init__(self._attribute_map)
+
+    @classmethod
+    def _attribute_map(cls, name, module):
+
+        if isinstance(module, DenseNet):
+            attributes = {
+                'forward': cls.forward.__get__(module),
+            }
+            return attributes
+        return None
+
+    def copy(self):
+        '''Copy this Canonizer.
+
+        Returns
+        -------
+        obj:`Canonizer`
+            A copy of this Canonizer.
+        '''
+        return DenseNetAdaptiveAvgPoolCanonizer()
+
+    def register(self, module, attributes):
+        module.features.add_module('final_relu', ReLU(inplace=True))
+        module.features.add_module('adaptive_avg_pool2d', AdaptiveAvgPool2d((1, 1)))
+        super(DenseNetAdaptiveAvgPoolCanonizer, self).register(module, attributes)
+
+    def remove(self):
+        '''Remove the overloaded attributes. Note that functions are descriptors, and therefore not direct attributes
+        of instance, which is why deleting instance attributes with the same name reverts them to the original
+        function.
+        '''
+        self.module.features = Sequential(*list(self.module.features.children())[:-2])
+        for key in self.attribute_keys:
+            delattr(self.module, key)
+
+    def forward(self, x):
+        out = self.features(x)
+        out = torch.flatten(out, 1)
+        out = self.classifier(out)
+        return out
+
+
+class DenseNetSeqThreshCanonizer(CompositeCanonizer):
+    def __init__(self):
+        super().__init__((
+            DenseNetAdaptiveAvgPoolCanonizer(),
+            SequentialMergeBatchNorm(),
+            ThreshReLUMergeBatchNorm(),
+        ))
+
+
+class DenseNetThreshSeqCanonizer(CompositeCanonizer):
+    def __init__(self):
+        super().__init__((
+            DenseNetAdaptiveAvgPoolCanonizer(),
+            ThreshReLUMergeBatchNorm(),
+            SequentialMergeBatchNorm(),
+        ))
