@@ -88,10 +88,10 @@ class MergeBatchNorm(Canonizer):
         self.linears = linears
         self.batch_norm = batch_norm
 
-        self.linear_params = [(linear.weight.data, getattr(linear.bias, 'data', None)) for linear in linears]
+        self.linear_params = [(linear.weight, linear.bias) for linear in linears]
 
         self.batch_norm_params = {
-            key: getattr(self.batch_norm, key).data for key in ('weight', 'bias', 'running_mean', 'running_var')
+            key: getattr(self.batch_norm, key) for key in ('weight', 'bias', 'running_mean', 'running_var', 'eps')
         }
 
         self.merge_batch_norm(self.linears, self.batch_norm)
@@ -101,14 +101,11 @@ class MergeBatchNorm(Canonizer):
         the merge.
         '''
         for linear, (weight, bias) in zip(self.linears, self.linear_params):
-            linear.weight.data = weight
-            if bias is None:
-                linear.bias = None
-            else:
-                linear.bias.data = bias
+            object.__setattr__(linear, 'weight', weight)
+            object.__setattr__(linear, 'bias', bias)
 
         for key, value in self.batch_norm_params.items():
-            getattr(self.batch_norm, key).data = value
+            object.__setattr__(self.batch_norm, key, value)
 
     @staticmethod
     def merge_batch_norm(modules, batch_norm):
@@ -127,27 +124,25 @@ class MergeBatchNorm(Canonizer):
         scale = batch_norm.weight / denominator
 
         for module in modules:
-            original_weight = module.weight.data
             if module.bias is None:
-                module.bias = torch.nn.Parameter(
-                    torch.zeros(1, device=original_weight.device, dtype=original_weight.dtype)
+                object.__setattr__(
+                    module, 'bias', torch.zeros(1, device=module.weight.device, dtype=module.weight.dtype)
                 )
-            original_bias = module.bias.data
 
+            index = (slice(None), *((None,) * (module.weight.ndim - 1)))
             if isinstance(module, ConvolutionTranspose):
-                index = (None, slice(None), *((None,) * (original_weight.ndim - 2)))
-            else:
-                index = (slice(None), *((None,) * (original_weight.ndim - 1)))
+                index = index[1::-1] + index[2:]
 
             # merge batch_norm into linear layer
-            module.weight.data = original_weight * scale[index]
-            module.bias.data = (original_bias - batch_norm.running_mean) * scale + batch_norm.bias
+            object.__setattr__(module, 'weight', module.weight * scale[index])
+            object.__setattr__(module, 'bias', (module.bias - batch_norm.running_mean) * scale + batch_norm.bias)
 
         # change batch_norm parameters to produce identity
-        batch_norm.running_mean.data = torch.zeros_like(batch_norm.running_mean.data)
-        batch_norm.running_var.data = torch.ones_like(batch_norm.running_var.data)
-        batch_norm.bias.data = torch.zeros_like(batch_norm.bias.data)
-        batch_norm.weight.data = torch.ones_like(batch_norm.weight.data)
+        for key, func in zip(
+            ('running_mean', 'running_var', 'bias', 'weight', 'eps'),
+            (*(torch.zeros_like, torch.ones_like) * 2, lambda _: 0.)
+        ):
+            object.__setattr__(batch_norm, key, func(getattr(batch_norm, key)))
 
 
 class SequentialMergeBatchNorm(MergeBatchNorm):
