@@ -324,12 +324,12 @@ class ParamMod:
                     param = getattr(module, key)
                     if param is not None:
                         stored_params[key] = param
-                        setattr(module, key, torch.nn.Parameter(modifier(param.data, key)))
+                        object.__setattr__(module, key, modifier(param.data, key))
 
             yield module
         finally:
             for key, value in stored_params.items():
-                setattr(module, key, value)
+                object.__setattr__(module, key, value)
 
 
 def collect_leaves(module):
