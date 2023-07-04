@@ -108,7 +108,6 @@ class Activation(metaclass=SubclassMeta):
         torch.nn.modules.activation.Hardswish,
         torch.nn.modules.activation.LeakyReLU,
         torch.nn.modules.activation.LogSigmoid,
-        torch.nn.modules.activation.MultiheadAttention,
         torch.nn.modules.activation.PReLU,
         torch.nn.modules.activation.ReLU,
         torch.nn.modules.activation.ReLU6,
