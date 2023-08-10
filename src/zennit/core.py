@@ -752,27 +752,54 @@ class BasicHook(Hook):
         tuple of :py:obj:`torch.nn.Module`
             The modified input gradient tensors.
         '''
-        original_input, *original_args = self.stored_tensors['input']
-        original_input = original_input.clone()
-        original_kwargs = self.stored_tensors['kwargs']
+        input_mask = [elem is not None for elem in self.stored_tensors['input']]
+        output_mask = [elem is not None for elem in grad_output]
+        cgrad_output = tuple(compress(grad_output, output_mask))
+
+        original_inputs = [tensor.clone() for tensor in self.stored_tensors['input']]
+        kwargs = self.stored_tensors['kwargs']
         inputs = []
         outputs = []
         for in_mod, param_mod, out_mod in zip(self.input_modifiers, self.param_modifiers, self.output_modifiers):
-            input = in_mod(original_input).requires_grad_()
+            mod_args = (in_mod(tensor).requires_grad_() for tensor in compress(original_inputs, input_mask))
+            args = tuple(uncompress(original_inputs, input_mask, mod_args))
             with ParamMod.ensure(param_mod)(module) as modified, torch.autograd.enable_grad():
-                output = modified.forward(input, *original_args, **original_kwargs)
-                output = out_mod(output)
-            inputs.append(input)
+                output = modified.forward(*args, **kwargs)
+                if not isinstance(output, tuple):
+                    output = (output,)
+                output = tuple(out_mod(tensor) for tensor in compress(output, output_mask))
+            inputs.append(compress(args, input_mask))
             outputs.append(output)
-        grad_outputs = self.gradient_mapper(grad_output[0], outputs)
-        gradients = torch.autograd.grad(
-            outputs,
-            inputs,
-            grad_outputs=grad_outputs,
-            create_graph=grad_output[0].requires_grad
+
+        inputs = list(zip(*inputs))
+        outputs = list(zip(*outputs))
+        input_struct = [len(elem) for elem in inputs]
+        output_struct = [len(elem) for elem in outputs]
+
+        grad_outputs = tuple(
+            self.gradient_mapper(gradout, outs)
+            for gradout, outs in zip(cgrad_output, outputs)
         )
-        relevance = self.reducer(inputs, gradients)
-        return tuple(relevance if original.shape == relevance.shape else None for original in grad_input)
+        inputs_flat = tuple(chain.from_iterable(inputs))
+        outputs_flat = tuple(chain.from_iterable(outputs))
+        if not all(isinstance(elem, torch.Tensor) for elem in grad_outputs):
+            # if there is only a single output modifier, grad_outputs may contain tensors
+            grad_outputs = tuple(chain.from_iterable(grad_outputs))
+
+        gradients_flat = torch.autograd.grad(
+            outputs_flat,
+            inputs_flat,
+            grad_outputs=grad_outputs,
+            create_graph=any(tensor.requires_grad for tensor in cgrad_output)
+        )
+
+        # input_it = iter(inputs)
+        # inputs_re = [tuple(islice(input_it, size)) for size in input_struct]
+        gradient_it = iter(gradients_flat)
+        gradients = [tuple(islice(gradient_it, size)) for size in input_struct]
+
+        relevances = (self.reducer(inp, grad) for inp, grad in zip(inputs, gradients))
+        return tuple(uncompress(repeat(None), input_mask, relevances))
 
     def copy(self):
         '''Return a copy of this hook.
