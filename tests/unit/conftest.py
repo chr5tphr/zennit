@@ -43,9 +43,8 @@ def pytest_generate_tests(metafunc):
     scope='session',
     params=[
         0xdeadbeef,
-        0xd0c0ffee,
         *[pytest.param(seed, marks=pytest.mark.extended) for seed in [
-            0xc001bee5, 0xc01dfee7, 0xbe577001, 0xca7b0075, 0x1057b0a7, 0x900ddeed
+            0xd0c0ffee, 0xc001bee5, 0xc01dfee7, 0xbe577001, 0xca7b0075, 0x1057b0a7, 0x900ddeed
         ]],
     ],
     ids=hex
@@ -261,7 +260,7 @@ def partial_name_map_composite(name_map_composite, pyrng):
 
 @pytest.fixture(scope='session')
 def mixed_composite(partial_name_map_composite, special_first_layer_map_composite):
-    '''Fixture to create NameLayerMapComposites based on an explicit NameMapComposite and
+    '''Fixture to create mixtures of explicit NameMapComposite and
     SpecialFirstLayerMapComposites.
     '''
     composites = [partial_name_map_composite, special_first_layer_map_composite]

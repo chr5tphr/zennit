@@ -20,6 +20,8 @@ import functools
 import weakref
 from contextlib import contextmanager
 from typing import Generator, Iterator
+from itertools import compress, repeat
+from inspect import signature
 
 import torch
 
@@ -235,6 +237,44 @@ def zero_wrap(zero_params):
     return zero_params_wrapper
 
 
+def uncompress(data, selector, compressed) -> Generator:
+    '''Generator which, given a compressed iterable produced by :py:obj:`itertools.compress` and (some iterable similar
+    to) the original data and selector used for :py:obj:`~itertools.compress`, yields values from `compressed` or
+    `data` depending on `selector`. `True` values in `selector` skip `data` one ahead and yield a value from
+    `compressed`, while `False` values yield one value from `data`.
+
+    Parameters
+    ----------
+    data : iterable
+        The iterable (similar to the) original data. `False` values in the `selector` will be filled with values from
+        this iterator, while `True` values will cause this iterable to be skipped.
+    selector : iterable of bool
+        The original selector used to produce `compressed`. Chooses whether elements from `data` or from `compressed`
+        will be yielded.
+    compressed : iterable
+        The results of :py:obj:`itertools.compress`. Will be yielded for each `True` element in `selector`.
+
+    Yields
+    ------
+    object
+        An element of `data` if the associated element of `selector` is `False`, otherwise an element of `compressed`
+        while skipping `data` one ahead.
+
+    '''
+    its = iter(selector)
+    itc = iter(compressed)
+    itd = iter(data)
+    for select in its:
+        try:
+            if select:
+                next(itd)
+                yield next(itc)
+            else:
+                yield next(itd)
+        except StopIteration:
+            break
+
+
 class ParamMod:
     '''Class to produce a context manager to temporarily modify parameter attributes (all by default) of a module.
 
@@ -394,6 +434,7 @@ class Identity(torch.autograd.Function):
         inputs: tuple of :py:obj:`torch.Tensor`
             The unmodified inputs.
         '''
+        ctx.mark_non_differentiable(*[elem for elem in inputs if not elem.requires_grad])
         return inputs
 
     @staticmethod
@@ -422,15 +463,41 @@ class Hook:
         self.active = True
         self.tensor_handles = RemovableHandleList()
 
-    def pre_forward(self, module, input):
+    @staticmethod
+    def _inject_grad_fn(args):
+        tensor_mask = tuple(isinstance(elem, torch.Tensor) for elem in args)
+        tensors = tuple(compress(args, tensor_mask))
+        # tensors = [(n, elem) for elem in enumerate(args) if isinstance(elem, torch.Tensor)]
+
+        # only if gradient required
+        if not any(tensor.requires_grad for tensor in tensors):
+            return None, args, tensor_mask
+
+        # add identity to ensure .grad_fn exists and all tensors share the same .grad_fn
+        post_tensors = Identity.apply(*tensors)
+        grad_fn = next((tensor.grad_fn for tensor in post_tensors if tensor.grad_fn is not None), None)
+        if grad_fn is None:
+            # sanity check, should never happen because the check above already catches cases in which no input tensor
+            # requires a gradient, and in normal conditions, we will always obtain a grad_fn from `Identity` for each
+            # tensor with requires_grad=True
+            raise RuntimeError('Backward hook could not be registered!')  # pragma: no cover
+
+        # work-around to support in-place operations
+        post_tensors = tuple(elem.clone() for elem in post_tensors)
+        post_args = tuple(uncompress(args, tensor_mask, post_tensors))
+        return grad_fn, post_args, tensor_mask
+
+    def pre_forward(self, module, args, kwargs):
         '''Apply an Identity to the input before the module to register a backward hook.
 
         Parameters
         ----------
         module: :py:obj:`torch.nn.Module`
             The module to which this hook is attached.
-        input: :py:obj:`torch.Tensor`
-            The input tensor.
+        args: tuple of :py:obj:`torch.Tensor`
+            The input tensors passed to ``module.forward``.
+        kwargs: dict
+            The keyword arguments passed to ``module.forward``.
 
         Returns
         -------
@@ -440,40 +507,41 @@ class Hook:
         '''
         hook_ref = weakref.ref(self)
 
+        grad_fn, post_args, input_tensor_mask = self._inject_grad_fn(args)
+        if grad_fn is None:
+            return None
+
         @functools.wraps(self.backward)
         def wrapper(grad_input, grad_output):
             hook = hook_ref()
             if hook is not None and hook.active:
-                return hook.backward(module, grad_input, hook.stored_tensors['grad_output'])
+                return hook.backward(
+                    module,
+                    list(uncompress(
+                        repeat(None),
+                        input_tensor_mask,
+                        grad_input,
+                    )),
+                    hook.stored_tensors['grad_output'],
+                )
             return None
 
-        if not isinstance(input, tuple):
-            input = (input,)
+        # register the input tensor gradient hook
+        self.tensor_handles.append(grad_fn.register_hook(wrapper))
 
-        # only if gradient required
-        if input[0].requires_grad:
-            # add identity to ensure .grad_fn exists
-            post_input = Identity.apply(*input)
-            # register the input tensor gradient hook
-            self.tensor_handles.append(
-                post_input[0].grad_fn.register_hook(wrapper)
-            )
-            # work around to support in-place operations
-            post_input = tuple(elem.clone() for elem in post_input)
-        else:
-            # no gradient required
-            post_input = input
-        return post_input[0] if len(post_input) == 1 else post_input
+        return post_args, kwargs
 
-    def post_forward(self, module, input, output):
+    def post_forward(self, module, args, kwargs, output):
         '''Register a backward-hook to the resulting tensor right after the forward.
 
         Parameters
         ----------
         module: :py:obj:`torch.nn.Module`
             The module to which this hook is attached.
-        input: :py:obj:`torch.Tensor`
-            The input tensor.
+        args: tuple of :py:obj:`torch.Tensor`
+            The input tensors passed to ``module.forward``.
+        kwargs: tuple of object
+            The keyword arguments passed to ``module.forward``.
         output: :py:obj:`torch.Tensor`
             The output tensor.
 
@@ -484,23 +552,35 @@ class Hook:
         '''
         hook_ref = weakref.ref(self)
 
+        single = not isinstance(output, tuple)
+        if single:
+            output = (output,)
+
+        grad_fn, post_output, output_tensor_mask = self._inject_grad_fn(output)
+        if grad_fn is None:
+            return None
+
         @functools.wraps(self.pre_backward)
         def wrapper(grad_input, grad_output):
             hook = hook_ref()
             if hook is not None and hook.active:
-                return hook.pre_backward(module, grad_input, grad_output)
+                return hook.pre_backward(
+                    module,
+                    grad_input,
+                    tuple(uncompress(
+                        repeat(None),
+                        output_tensor_mask,
+                        grad_output
+                    ))
+                )
             return None
 
-        if not isinstance(output, tuple):
-            output = (output,)
+        # register the output tensor gradient hook
+        self.tensor_handles.append(grad_fn.register_hook(wrapper))
 
-        # only if gradient required
-        if output[0].grad_fn is not None:
-            # register the output tensor gradient hook
-            self.tensor_handles.append(
-                output[0].grad_fn.register_hook(wrapper)
-            )
-        return output[0] if len(output) == 1 else output
+        if single:
+            return post_output[0]
+        return post_output
 
     def pre_backward(self, module, grad_input, grad_output):
         '''Store the grad_output for the backward hook.
@@ -516,15 +596,17 @@ class Hook:
         '''
         self.stored_tensors['grad_output'] = grad_output
 
-    def forward(self, module, input, output):
+    def forward(self, module, args, kwargs, output):
         '''Hook applied during forward-pass.
 
         Parameters
         ----------
         module: :py:obj:`torch.nn.Module`
             The module to which this hook is attached.
-        input: :py:obj:`torch.Tensor`
-            The input tensor.
+        args: tuple of :py:obj:`torch.Tensor`
+            The input tensors passed to ``module.forward``.
+        kwargs: tuple of object
+            The keyword arguments passed to ``module.forward``.
         output: :py:obj:`torch.Tensor`
             The output tensor.
         '''
@@ -573,11 +655,34 @@ class Hook:
             A list of removable handles, one for each registered hook.
 
         '''
+        def with_kwargs(method, has_output=True):
+            '''Check whether the method uses args/kwargs, or only inputs. This ensures compatibility with rules that do
+            not consider kwargs, and reduces code clutter.
+
+            Parameters
+            ----------
+            method: function
+                Function to check.
+            has_output: bool
+                Function to check.
+
+            Returns
+            -------
+            bool
+                True if `method` uses kwargs.
+            '''
+            params = signature(method).parameters
+            # assume with_kwargs if forward has not 3 parameters and 3rd is not called 'output'
+            if has_output:
+                return len(params) != 3 and list(params)[2] != 'output'
+            # e.g., pre_forward has no output, so we expect 2 parameters
+            return len(params) != 2
+
         return RemovableHandleList([
             RemovableHandle(self),
-            module.register_forward_pre_hook(self.pre_forward),
-            module.register_forward_hook(self.post_forward),
-            module.register_forward_hook(self.forward),
+            module.register_forward_pre_hook(self.pre_forward, with_kwargs=with_kwargs(self.pre_forward, False)),
+            module.register_forward_hook(self.post_forward, with_kwargs=with_kwargs(self.post_forward)),
+            module.register_forward_hook(self.forward, with_kwargs=with_kwargs(self.forward)),
         ])
 
 
@@ -645,19 +750,22 @@ class BasicHook(Hook):
         self.gradient_mapper = gradient_mapper
         self.reducer = reducer
 
-    def forward(self, module, input, output):
+    def forward(self, module, args, kwargs, output):
         '''Forward hook to save module in-/outputs.
 
         Parameters
         ----------
         module: :py:obj:`torch.nn.Module`
             The module to which this hook is attached.
-        input: :py:obj:`torch.Tensor`
-            The input tensor.
+        args: tuple of :py:obj:`torch.Tensor`
+            The input tensors passed to ``module.forward``.
+        kwargs: tuple of object
+            The keyword arguments passed to ``module.forward``.
         output: :py:obj:`torch.Tensor`
             The output tensor.
         '''
-        self.stored_tensors['input'] = input
+        self.stored_tensors['input'] = args
+        self.stored_tensors['kwargs'] = kwargs
 
     def backward(self, module, grad_input, grad_output):
         '''Backward hook to compute LRP based on the class attributes.
@@ -676,13 +784,15 @@ class BasicHook(Hook):
         tuple of :py:obj:`torch.nn.Module`
             The modified input gradient tensors.
         '''
-        original_input = self.stored_tensors['input'][0].clone()
+        original_input, *original_args = self.stored_tensors['input']
+        original_input = original_input.clone()
+        original_kwargs = self.stored_tensors['kwargs']
         inputs = []
         outputs = []
         for in_mod, param_mod, out_mod in zip(self.input_modifiers, self.param_modifiers, self.output_modifiers):
             input = in_mod(original_input).requires_grad_()
             with ParamMod.ensure(param_mod)(module) as modified, torch.autograd.enable_grad():
-                output = modified.forward(input)
+                output = modified.forward(input, *original_args, **original_kwargs)
                 output = out_mod(output)
             inputs.append(input)
             outputs.append(output)
