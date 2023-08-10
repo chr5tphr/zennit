@@ -8,7 +8,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Subset
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor
 from torchvision.datasets import ImageFolder
-from torchvision.models import vgg16, vgg16_bn, resnet50
+from torchvision.models import vgg11, vgg11_bn, vgg16, vgg16_bn, resnet18, resnet50
 
 from zennit.attribution import Gradient, SmoothGrad, IntegratedGradients, Occlusion
 from zennit.composites import COMPOSITES
@@ -19,6 +19,9 @@ from zennit.torchvision import VGGCanonizer, ResNetCanonizer
 MODELS = {
     'vgg16': (vgg16, VGGCanonizer),
     'vgg16_bn': (vgg16_bn, VGGCanonizer),
+    'vgg11': (vgg11, VGGCanonizer),
+    'vgg11_bn': (vgg11_bn, VGGCanonizer),
+    'resnet18': (resnet18, ResNetCanonizer),
     'resnet50': (resnet50, ResNetCanonizer),
 }
 
