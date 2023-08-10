@@ -85,15 +85,23 @@ for the layer-wise relevance propagation (LRP)-based **Composites**, used for
 all activations.
 :py:class:`~zennit.core.Hook` has a dictionary attribute ``stored_tensors``,
 which is used to store the output gradient as ``stored_tensors['grad_output']``.
-:py:meth:`~zennit.core.Hook.forward` has 3 arguments:
+:py:meth:`~zennit.core.Hook.forward` can have two shapes, one with keyword-arguments, and one without.
+If the rule does not need to handle keyword arguments:
 
 * ``module``, which is the current module the hook has been registered to,
-* ``input``, which is the module's input tensor, and
-* ``output``, which is the module's output tensor.
+* ``input``, which are the module's input tensors, and
+* ``output``, which are the module's output tensors.
+
+If the rule should also handle keyword arguments (new in version 1.0.0), the following signature may be used:
+
+* ``module``, which is the current module the hook has been registered to,
+* ``args``, which are the module's positional inputs (mixed tensors and parameters allowed),
+* ``kwargs``, which are the module's keyword inputs (tensors unsupported), and
+* ``output``, which are the module's output tensors.
 
 :py:meth:`~zennit.core.Hook.forward` is always called *after* the forward has
 been called, thus making ``output`` available.
-Using the notation above, ``input`` is :math:`x` and ``output`` is :math:`f(x)`.
+Using the first notation above, ``input`` is :math:`x` and ``output`` is :math:`f(x)`.
 
 A layer-wise *gradient times input* can be implemented by storing the input
 tensor in the forward pass and directly using ``grad_input`` in the backward
