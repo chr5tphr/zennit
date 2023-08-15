@@ -18,6 +18,8 @@
 '''Type definitions for convenience.'''
 import torch
 
+from .layer import Distance as DistanceLayer
+
 
 class SubclassMeta(type):
     '''Meta class to bundle multiple subclasses.'''
@@ -123,4 +125,11 @@ class Activation(metaclass=SubclassMeta):
         torch.nn.modules.activation.Tanh,
         torch.nn.modules.activation.Tanhshrink,
         torch.nn.modules.activation.Threshold,
+    )
+
+
+class Distance(metaclass=SubclassMeta):
+    '''Abstract base class that describes distance modules.'''
+    __subclass__ = (
+        DistanceLayer,
     )
