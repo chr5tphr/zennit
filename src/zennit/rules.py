@@ -436,3 +436,129 @@ class ReLUBetaSmooth(Hook):
     def backward(self, module, grad_input, grad_output):
         '''Modify ReLU gradient to the smooth softplus gradient :cite:p:`dombrowski2019explanations`.'''
         return (torch.sigmoid(self.beta_smooth * self.stored_tensors['input'][0]) * grad_output[0],)
+
+class TakesMost(Hook):
+    '''LRP rule for max-pooling layers that distributes relevance based on a
+    softmax of input contributions within each pooling window.
+
+    Parameters
+    ----------
+    dimensions : int, optional
+        Number of spatial dimensions of the pooling operation (1 for 1D, 2 for 2D).
+        Default is 2.
+    beta : float, optional
+        Scaling factor for the inputs before the softmax calculation. Higher
+        values lead to a harder softmax, approximating winner-takes-all.
+        Default is 1.0.
+    '''
+    def __init__(self, dimensions=2, beta=1.0):
+        super().__init__()
+        self.dimensions = dimensions
+        self.beta = beta
+        self.pool_fn = getattr(torch.nn.functional, f'max_pool{dimensions}d')
+        self.conv_fn = getattr(torch.nn.functional, f'conv{dimensions}d')
+        self.conv_transpose_fn = getattr(torch.nn.functional, f'conv_transpose{dimensions}d')
+
+    def _ensure_tuple(self, value, n):
+        """Convert int to n-tuple if necessary"""
+        return (value,) * n if isinstance(value, int) else value
+
+    def copy(self):
+        """Return a copy of this hook with the same beta parameter."""
+        return self.__class__(dimensions=self.dimensions, beta=self.beta)
+
+    def forward(self, module, input, output):
+        self.stored_tensors['input'] = input
+
+    def _calculate_output_padding(self, input_shape, pooled_shape, stride, kernel_size, padding, dilation):
+        """Calculate output padding for transposed convolution"""
+        output_padding = []
+        for i in range(self.dimensions):
+            target_size = input_shape[2 + i]
+            pooled_size = pooled_shape[2 + i]
+            s, k, p, d = stride[i], kernel_size[i], padding[i], dilation[i]
+            op = target_size - ((pooled_size - 1) * s - 2 * p + d * (k - 1) + 1)
+            output_padding.append(op)
+        return tuple(output_padding)
+
+    def _create_unpool_params(self, input_tensor, pooled_tensor, stride, kernel_size, padding, dilation):
+        """Create common parameters for unpooling operations"""
+        num_channels = input_tensor.shape[1]
+        kernel_shape = (num_channels, 1) + kernel_size
+        kernel = torch.ones(kernel_shape, device=input_tensor.device, dtype=input_tensor.dtype)
+
+        output_padding = self._calculate_output_padding(
+            input_tensor.shape, pooled_tensor.shape, stride, kernel_size, padding, dilation
+        )
+
+        # Create slicing for potential cropping
+        slicing = [slice(None), slice(None)]  # For batch and channels
+        for i in range(self.dimensions):
+            slicing.append(slice(0, input_tensor.shape[2 + i]))
+
+        return kernel, output_padding, tuple(slicing)
+
+    def _unpool(self, pooled, kernel, stride, padding, output_padding, dilation, groups, slicing):
+        """Common unpooling function"""
+        result = self.conv_transpose_fn(
+            pooled, weight=kernel, stride=stride, padding=padding,
+            output_padding=output_padding, dilation=dilation, groups=groups
+        )
+        return result[slicing]
+
+    def backward(self, module, grad_input, grad_output):
+        input_tensor = self.stored_tensors['input'][0]
+
+        # Get module parameters as tuples
+        stride = self._ensure_tuple(module.stride, self.dimensions)
+        kernel_size = self._ensure_tuple(module.kernel_size, self.dimensions)
+        padding = self._ensure_tuple(module.padding, self.dimensions)
+        dilation = self._ensure_tuple(module.dilation, self.dimensions)
+
+        # 1. Calculate softmax weights
+        scaled_inputs = self.beta * input_tensor
+
+        # Pool to get max values for numerical stability
+        max_vals_pooled = self.pool_fn(
+            scaled_inputs, kernel_size=kernel_size,
+            stride=stride, padding=padding, dilation=dilation
+        )
+
+        # Create common parameters for unpooling
+        unpool_kernel, output_padding, slicing = self._create_unpool_params(
+            scaled_inputs, max_vals_pooled, stride, kernel_size, padding, dilation
+        )
+        num_channels = input_tensor.shape[1]
+
+        # Unpool max values
+        max_vals_unpooled = self._unpool(
+            max_vals_pooled, unpool_kernel, stride, padding,
+            output_padding, dilation, num_channels, slicing
+        )
+
+        # Calculate exp(input - max) for numerical stability
+        exp_input = torch.exp(scaled_inputs - max_vals_unpooled)
+
+        # Sum exp_input over windows
+        summed_exp_pooled = self.conv_fn(
+            exp_input, weight=unpool_kernel, stride=stride,
+            padding=padding, dilation=dilation, groups=num_channels
+        )
+
+        # Unpool summed exp values
+        summed_exp_unpooled = self._unpool(
+            summed_exp_pooled, unpool_kernel, stride, padding,
+            output_padding, dilation, num_channels, slicing
+        )
+
+        # Calculate softmax output
+        softmax_output = exp_input / (summed_exp_unpooled + 1e-10)
+
+        # 2. Distribute gradients
+        expanded_grad = self._unpool(
+            grad_output[0], unpool_kernel, stride, padding,
+            output_padding, dilation, num_channels, slicing
+        )
+
+        # Return weighted gradients
+        return (softmax_output * expanded_grad,)
