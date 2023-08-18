@@ -233,7 +233,7 @@ class AlphaBeta(BasicHook):
     '''
     def __init__(self, alpha=2., beta=1., stabilizer=1e-6, zero_params=None):
         if alpha < 0 or beta < 0:
-            raise ValueError("Both alpha and beta parameters must be positive!")
+            raise ValueError("Both alpha and beta parameters must be non-negative!")
         if (alpha - beta) != 1.:
             raise ValueError("The difference of parameters alpha - beta must equal 1!")
         mod_kwargs = {'zero_params': zero_params}
