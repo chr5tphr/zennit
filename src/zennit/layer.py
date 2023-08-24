@@ -160,5 +160,4 @@ class LogMeanExpPool(torch.nn.Module):
             the LogMeanExpPool of `input`
         '''
         n_dims = input.shape[self.dim]
-        return (torch.logsumexp(self.beta * input, dim=self.dim)
-                - torch.log(torch.tensor(n_dims, dtype=input.dtype))) / self.beta
+        return (torch.logsumexp(self.beta * input, dim=self.dim) - math.log(n_dims)) / self.beta
