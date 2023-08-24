@@ -418,9 +418,10 @@ class KMeansCanonizer(Canonizer):
         weight = weight[mask].reshape(n_clusters, n_clusters - 1, n_dims)
         norms = torch.norm(self.distance.centroids, dim=-1)
         bias = (norms[None, :]**2 - norms[:, None]**2)[mask].reshape(n_clusters, n_clusters - 1)
-        setattr(self.parent_module, self.child_name,
-                torch.nn.Sequential(NeuralizedKMeans(weight, bias),
-                                    LogMeanExpPool(self.beta)))
+        self.parent_module.add_module(
+            self.child_name,
+            torch.nn.Sequential(NeuralizedKMeans(weight, bias), LogMeanExpPool(self.beta))
+        )
 
     def remove(self):
         """Revert the changes introduced by this canonizer."""
