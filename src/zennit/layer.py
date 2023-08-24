@@ -115,8 +115,7 @@ class NeuralizedKMeans(torch.nn.Module):
         :py:obj:`torch.Tensor`
             shape (N, K, K-1) tensor of k-means discriminants
         '''
-        x = torch.einsum('nd,kjd->nkj', x, self.weight) + self.bias
-        return x
+        return torch.einsum('nd,kjd->nkj', x, self.weight) + self.bias
 
 
 class LogMeanExpPool(torch.nn.Module):
