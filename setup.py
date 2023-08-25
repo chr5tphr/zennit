@@ -54,7 +54,7 @@ setup(
         'click',
         'numpy',
         'Pillow',
-        'torch>=1.7.0',
+        'torch>=2.0.0',
         'torchvision',
     ],
     setup_requires=[
