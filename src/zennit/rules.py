@@ -322,7 +322,7 @@ class Pass(Hook):
     If the rule of a layer shall not be any other, is elementwise and shall not be the gradient, the `Pass` rule simply
     passes upper layer relevance through to the lower layer.
     '''
-    def backward(self, module, grad_input, grad_output):
+    def backward(self, module, grad_input, grad_output, grad_sink):
         '''Pass through the upper gradient, skipping the one for this layer.'''
         return grad_output
 
@@ -399,16 +399,16 @@ class Flat(BasicHook):
 
 class ReLUDeconvNet(Hook):
     '''DeconvNet ReLU rule :cite:p:`zeiler2014visualizing`.'''
-    def backward(self, module, grad_input, grad_output):
+    def backward(self, module, grad_input, grad_output, grad_sink):
         '''Modify ReLU gradient according to DeconvNet :cite:p:`zeiler2014visualizing`.'''
-        return (grad_output[0].clamp(min=0),)
+        return grad_output[0].clamp(min=0)
 
 
 class ReLUGuidedBackprop(Hook):
     '''GuidedBackprop ReLU rule :cite:p:`springenberg2015striving`.'''
-    def backward(self, module, grad_input, grad_output):
+    def backward(self, module, grad_input, grad_output, grad_sink):
         '''Modify ReLU gradient according to GuidedBackprop :cite:p:`springenberg2015striving`.'''
-        return (grad_input[0] * (grad_output[0] > 0.),)
+        return grad_input[0] * (grad_output[0] > 0.)
 
 
 class ReLUBetaSmooth(Hook):
@@ -433,6 +433,6 @@ class ReLUBetaSmooth(Hook):
         '''Remember the input for the backward pass.'''
         self.stored_tensors['input'] = input
 
-    def backward(self, module, grad_input, grad_output):
+    def backward(self, module, grad_input, grad_output, grad_sink):
         '''Modify ReLU gradient to the smooth softplus gradient :cite:p:`dombrowski2019explanations`.'''
-        return (torch.sigmoid(self.beta_smooth * self.stored_tensors['input'][0]) * grad_output[0],)
+        return torch.sigmoid(self.beta_smooth * self.stored_tensors['input'][0]) * grad_output[0]
