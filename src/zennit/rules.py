@@ -436,3 +436,152 @@ class ReLUBetaSmooth(Hook):
     def backward(self, module, grad_input, grad_output):
         '''Modify ReLU gradient to the smooth softplus gradient :cite:p:`dombrowski2019explanations`.'''
         return (torch.sigmoid(self.beta_smooth * self.stored_tensors['input'][0]) * grad_output[0],)
+
+
+class TakesMostBase(Hook):
+    '''Base class for TakesMost rules.
+    This class provides a common interface for rule variants that utilize a softmax-like weighting of the input
+    contributions based on their magnitude.
+
+    Parameters
+    ----------
+    beta: float
+        Beta parameter for controlling the sensitivity of the softmax weighting.
+
+    Methods
+    -------
+    max_fn(input, kernel_size, stride, padding, dilation):
+        Computes the maximum value in a local window for each entry in the input tensor.
+    sum_fn(input, kernel, stride, padding, dilation):
+        Computes the sum of elements in a local window for each entry in the input tensor.
+    forward(module, input, output):
+        Stores the input for later use in the backward pass.
+    backward(module, grad_input, grad_output):
+        Modifies the gradient based on the softmax weighting of the input contributions.
+    '''
+    def __init__(self, beta=1.0):
+        super().__init__()
+        self.beta = beta
+        self.stored_tensors = {}
+
+    def copy(self):
+        '''Return a copy of this hook with the same beta parameter.'''
+        return self.__class__(beta=self.beta)
+
+    def max_fn(self, input, kernel_size, stride, padding, dilation):
+        raise NotImplementedError("Implement in subclass")
+
+    def sum_fn(self, input, kernel, stride, padding, dilation):
+        raise NotImplementedError("Implement in subclass")
+
+    def forward(self, module, input, output):
+        self.stored_tensors['input'] = input
+
+    def backward(self, module, grad_input, grad_output):
+        '''Modifies the gradient based on the softmax-like weighting of input contributions.'''
+        stored_input = self.stored_tensors['input'][0]
+
+        kernel_size = module.kernel_size
+        stride = module.stride
+        padding = module.padding
+        dilation = module.dilation
+
+        # For numerical stability, we subtract the maximum value from the input
+        max_val = self.max_fn(self.beta * stored_input, kernel_size, stride, padding, dilation)
+        exp_input = torch.exp(self.beta * stored_input - max_val)
+        summed_elements = self.sum_fn(exp_input, kernel_size, stride=stride, padding=padding, dilation=dilation)
+        softmax_output = exp_input / summed_elements
+
+        return (softmax_output * grad_output[0],)
+
+
+class MinTakesMost1d(TakesMostBase):
+    '''1D variant of TakesMost rule that weights the smallest contributions the most.
+    This rule is a 1D variant of TakesMostBase, but weights the smallest input contributions the most.
+
+    Methods
+    -------
+    __init__(beta=1.0):
+        Initializes the MinTakesMost1d class with a negative beta value.
+    '''
+    def __init__(self, beta=1.0):
+        super().__init__(-beta)
+
+    def max_fn(self, input, kernel_size, stride, padding, dilation):
+        return torch.nn.functional.max_pool1d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
+
+    def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        in_channels = input.shape[1]
+        kernel = torch.ones((in_channels, 1, kernel_size), device=input.device)
+        return torch.nn.functional.conv1d(input, weight=kernel, stride=stride, padding=padding, dilation=dilation,
+                                          groups=in_channels)
+
+
+class MaxTakesMost1d(TakesMostBase):
+    '''1D variant of TakesMost rule that weights the largest contributions the most.
+    This rule is a 1D variant of TakesMostBase, but weights the largest input contributions the most.
+
+    Methods
+    -------
+    __init__(beta=1.0):
+        Initializes the MaxTakesMost1d class.
+    '''
+    def __init__(self, beta=1.0):
+        super().__init__(beta)
+
+    def max_fn(self, input, kernel_size, stride, padding, dilation):
+        return torch.nn.functional.max_pool1d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
+
+    def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        in_channels = input.shape[1]
+        kernel = torch.ones((in_channels, 1, kernel_size), device=input.device)
+        return torch.nn.functional.conv1d(input, weight=kernel, stride=stride, padding=padding, dilation=dilation,
+                                          groups=in_channels)
+
+
+class MinTakesMost2d(TakesMostBase):
+    '''2D variant of TakesMost rule that weights the smallest contributions the most.
+    This rule is a 2D variant of TakesMostBase, but weights the smallest input contributions the most.
+
+    Methods
+    -------
+    __init__(beta=1.0):
+        Initializes the MinTakesMost2d class with a negative beta value.
+    '''
+    def __init__(self, beta=1.0):
+        super().__init__(-beta)
+
+    def max_fn(self, input, kernel_size, stride, padding, dilation):
+        return torch.nn.functional.max_pool2d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
+
+    def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        in_channels = input.shape[1]
+        if isinstance(kernel_size, int):
+            kernel_size = (kernel_size, kernel_size)
+        kernel = torch.ones((in_channels, 1, *kernel_size), device=input.device)
+        return torch.nn.functional.conv2d(input, weight=kernel, stride=stride, padding=padding, dilation=dilation,
+                                          groups=in_channels)
+
+
+class MaxTakesMost2d(TakesMostBase):
+    '''2D variant of TakesMost rule that weights the largest contributions the most.
+    This rule is a 2D variant of TakesMostBase, but weights the largest input contributions the most.
+
+    Methods
+    -------
+    __init__(beta=1.0):
+        Initializes the MaxTakesMost2d class.
+    '''
+    def __init__(self, beta=1.0):
+        super().__init__(beta)
+
+    def max_fn(self, input, kernel_size, stride, padding, dilation):
+        return torch.nn.functional.max_pool2d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
+
+    def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        in_channels = input.shape[1]
+        if isinstance(kernel_size, int):
+            kernel_size = (kernel_size, kernel_size)
+        kernel = torch.ones((in_channels, 1, *kernel_size), device=input.device)
+        return torch.nn.functional.conv2d(input, weight=kernel, stride=stride, padding=padding, dilation=dilation,
+                                          groups=in_channels)

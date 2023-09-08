@@ -18,12 +18,11 @@
 '''Functions to produce a canonical form of models fit for LRP'''
 from abc import ABCMeta, abstractmethod
 
-import copy
 import torch
 
 from .core import collect_leaves
-from .types import Linear, BatchNorm, ConvolutionTranspose, Distance
-from .layer import NeuralizedKMeans, LogMeanExpPool
+from .types import Linear, BatchNorm, ConvolutionTranspose
+from .layer import PairwiseCentroidDistance, NeuralizedKMeans, MinPool1d
 
 
 class Canonizer(metaclass=ABCMeta):
@@ -351,14 +350,13 @@ class KMeansCanonizer(Canonizer):
     >>> centroids = KMeans(n_clusters=10).fit(X).cluster_centers_
     >>> model = torch.nn.Sequential(Distance(torch.from_numpy(centroids).float(), power=2))
     >>> cluster_assignment = model(x).argmin()
-    >>> canonizer = KMeansCanonizer(beta=-1.)
+    >>> canonizer = KMeansCanonizer()
     >>> with Gradient(model, canonizer=[canonizer]) as attributor:
     >>>    output, attribution = attributor(x, torch.eye(len(centroids))[[cluster_assignment]])
     '''
-    def __init__(self, beta=-1.):
+    def __init__(self):
         self.distance = None
         self.distance_unchanged = None
-        self.beta = beta
         self.parent_module = None
         self.child_name = None
 
@@ -376,7 +374,7 @@ class KMeansCanonizer(Canonizer):
         instances = []
 
         for full_name, module in root_module.named_modules():
-            if isinstance(module, Distance) and module.power == 2:
+            if isinstance(module, PairwiseCentroidDistance) and module.power == 2:
                 instance = self.copy()
                 if '.' in full_name:
                     parent_name, child_name = full_name.rsplit('.', 1)
@@ -410,7 +408,6 @@ class KMeansCanonizer(Canonizer):
             Distance layers to replace.
         '''
         self.distance = distance_module
-        self.distance_unchanged = copy.deepcopy(self.distance)
 
         n_clusters, n_dims = self.distance.centroids.shape
         mask = ~torch.eye(n_clusters, dtype=bool)
@@ -420,11 +417,19 @@ class KMeansCanonizer(Canonizer):
         bias = (norms[None, :]**2 - norms[:, None]**2)[mask].reshape(n_clusters, n_clusters - 1)
         setattr(self.parent_module, self.child_name,
                 torch.nn.Sequential(NeuralizedKMeans(weight, bias),
-                                    LogMeanExpPool(self.beta)))
+                                    MinPool1d(n_clusters - 1),
+                                    torch.nn.Flatten()))
 
     def remove(self):
         """Revert the changes introduced by this canonizer."""
-        setattr(self.parent_module, self.child_name, self.distance_unchanged)
+        setattr(self.parent_module, self.child_name, self.distance)
 
     def copy(self):
-        return KMeansCanonizer(self.beta)
+        '''Copy this Canonizer.
+
+        Returns
+        -------
+        :py:obj:`Canonizer`
+            A copy of this Canonizer.
+        '''
+        return KMeansCanonizer()

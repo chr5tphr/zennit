@@ -36,8 +36,8 @@ class Sum(torch.nn.Module):
         return torch.sum(input, dim=self.dim)
 
 
-class Distance(torch.nn.Module):
-    '''Compute pairwise distances between two sets of points.
+class PairwiseCentroidDistance(torch.nn.Module):
+    '''Compute pairwise distances between inputs and centroids.
 
     Initialized with a set of centroids, this layer computes the pairwise distance between the input and the centroids.
 
@@ -51,7 +51,7 @@ class Distance(torch.nn.Module):
     Examples
     --------
     >>> centroids = torch.randn(10, 2)
-    >>> distance = Distance(centroids)
+    >>> distance = PairwiseCentroidDistance(centroids)
     >>> x = torch.randn(100, 2)
     >>> distance(x)
 
@@ -74,8 +74,7 @@ class Distance(torch.nn.Module):
         :py:obj:`torch.Tensor`
             shape (N, K) tensor of distances
         '''
-        distance = torch.cdist(input, self.centroids)**self.power
-        return distance
+        return torch.cdist(input, self.centroids)**self.power
 
 
 class NeuralizedKMeans(torch.nn.Module):
@@ -119,36 +118,35 @@ class NeuralizedKMeans(torch.nn.Module):
         return x
 
 
-class LogMeanExpPool(torch.nn.Module):
-    '''Computes a log-mean-exp pool along an axis.
-
-    LogMeanExpPool computes :math:`\\frac{1}{\\beta} \\log \\frac{1}{N} \\sum_{i=1}^N \\exp(\\beta x_i)`
+class MinPool2d(torch.nn.MaxPool2d):
+    '''Computes a min pool.
 
     Parameters
     ----------
-    beta : float
-        stiffness of the pool. Positive values make the pool more like a max pool, negative values make the pool
-        more like a min pool. Default value is -1.
-    dim : int
-        dimension over which to pool
+    kernel_size : int or tuple
+        size of the pooling window
+    stride : int or tuple
+        stride of the pooling operation
+    padding : int or tuple
+        zero-padding added to both sides of the input
+    dilation : int or tuple
+        spacing between kernel elements
+    return_indices : bool
+        if True, will return the max indices along with the outputs
+    ceil_mode : bool
+        if True, will use ceil instead of floor to compute the output shape
 
     Examples
     --------
-    >>> x = torch.randn(10, 2)
-    >>> pool = LogMeanExpPool()
+    >>> pool = MinPool2d(2)
+    >>> x = torch.randn(1, 1, 4, 4)
     >>> pool(x)
-
     '''
-    def __init__(self, beta=1., dim=-1):
-        super().__init__()
-        self.dim = dim
-        self.beta = beta
+    def __init__(self, kernel_size, stride=None, padding=0, dilation=1, return_indices=False, ceil_mode=False):
+        super().__init__(kernel_size, stride, padding, dilation, return_indices, ceil_mode)
 
     def forward(self, input):
-        '''Computes the LogMeanExpPool of `input`.
-
-        If the input has shape (N1, N2, ..., Nk) and `self.dim` is `j`, then the output has shape
-        (N1, N2, ..., Nj-1, Nj+1, ..., Nk).
+        '''Computes the min pool of `input`.
 
         Parameters
         ----------
@@ -158,8 +156,49 @@ class LogMeanExpPool(torch.nn.Module):
         Returns
         -------
         :py:obj:`torch.Tensor`
-            the LogMeanExpPool of `input`
+            the min pool of `input`
         '''
-        n_dims = input.shape[self.dim]
-        return (torch.logsumexp(self.beta * input, dim=self.dim)
-                - torch.log(torch.tensor(n_dims, dtype=input.dtype))) / self.beta
+        return -super().forward(-input)
+
+
+class MinPool1d(torch.nn.MaxPool1d):
+    '''Computes a min pool.
+
+    Parameters
+    ----------
+    kernel_size : int or tuple
+        size of the pooling window
+    stride : int or tuple
+        stride of the pooling operation
+    padding : int or tuple
+        zero-padding added to both sides of the input
+    dilation : int or tuple
+        spacing between kernel elements
+    return_indices : bool
+        if True, will return the max indices along with the outputs
+    ceil_mode : bool
+        if True, will use ceil instead of floor to compute the output shape
+
+    Examples
+    --------
+    >>> pool = MinPool1d(2)
+    >>> x = torch.randn(1, 1, 4)
+    >>> pool(x)
+    '''
+    def __init__(self, kernel_size, stride=None, padding=0, dilation=1, return_indices=False, ceil_mode=False):
+        super().__init__(kernel_size, stride, padding, dilation, return_indices, ceil_mode)
+
+    def forward(self, input):
+        '''Computes the min pool of `input`.
+
+        Parameters
+        ----------
+        input : :py:obj:`torch.Tensor`
+            the input tensor
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`
+            the min pool of `input`
+        '''
+        return -super().forward(-input)
