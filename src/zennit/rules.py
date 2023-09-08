@@ -469,12 +469,15 @@ class TakesMostBase(Hook):
         return self.__class__(beta=self.beta)
 
     def max_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the maximum value in a local window for each entry in the input tensor.'''
         raise NotImplementedError("Implement in subclass")
 
-    def sum_fn(self, input, kernel, stride, padding, dilation):
+    def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the sum of elements in a local window for each entry in the input tensor.'''
         raise NotImplementedError("Implement in subclass")
 
     def forward(self, module, input, output):
+        '''Stores the input for later use in the backward pass.'''
         self.stored_tensors['input'] = input
 
     def backward(self, module, grad_input, grad_output):
@@ -508,9 +511,11 @@ class MinTakesMost1d(TakesMostBase):
         super().__init__(-beta)
 
     def max_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the maximum value in a local window for each entry in the input tensor.'''
         return torch.nn.functional.max_pool1d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
 
     def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the sum of elements in a local window for each entry in the input tensor.'''
         in_channels = input.shape[1]
         kernel = torch.ones((in_channels, 1, kernel_size), device=input.device)
         return torch.nn.functional.conv1d(input, weight=kernel, stride=stride, padding=padding, dilation=dilation,
@@ -526,13 +531,12 @@ class MaxTakesMost1d(TakesMostBase):
     __init__(beta=1.0):
         Initializes the MaxTakesMost1d class.
     '''
-    def __init__(self, beta=1.0):
-        super().__init__(beta)
-
     def max_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the maximum value in a local window for each entry in the input tensor.'''
         return torch.nn.functional.max_pool1d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
 
     def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the sum of elements in a local window for each entry in the input tensor.'''
         in_channels = input.shape[1]
         kernel = torch.ones((in_channels, 1, kernel_size), device=input.device)
         return torch.nn.functional.conv1d(input, weight=kernel, stride=stride, padding=padding, dilation=dilation,
@@ -552,9 +556,11 @@ class MinTakesMost2d(TakesMostBase):
         super().__init__(-beta)
 
     def max_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the maximum value in a local window for each entry in the input tensor.'''
         return torch.nn.functional.max_pool2d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
 
     def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the sum of elements in a local window for each entry in the input tensor.'''
         in_channels = input.shape[1]
         if isinstance(kernel_size, int):
             kernel_size = (kernel_size, kernel_size)
@@ -572,13 +578,12 @@ class MaxTakesMost2d(TakesMostBase):
     __init__(beta=1.0):
         Initializes the MaxTakesMost2d class.
     '''
-    def __init__(self, beta=1.0):
-        super().__init__(beta)
-
     def max_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the maximum value in a local window for each entry in the input tensor.'''
         return torch.nn.functional.max_pool2d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
 
     def sum_fn(self, input, kernel_size, stride, padding, dilation):
+        '''Computes the sum of elements in a local window for each entry in the input tensor.'''
         in_channels = input.shape[1]
         if isinstance(kernel_size, int):
             kernel_size = (kernel_size, kernel_size)

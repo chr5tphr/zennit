@@ -141,9 +141,6 @@ class MinPool2d(torch.nn.MaxPool2d):
     >>> x = torch.randn(1, 1, 4, 4)
     >>> pool(x)
     '''
-    def __init__(self, kernel_size, stride=None, padding=0, dilation=1, return_indices=False, ceil_mode=False):
-        super().__init__(kernel_size, stride, padding, dilation, return_indices, ceil_mode)
-
     def forward(self, input):
         '''Computes the min pool of `input`.
 
@@ -184,9 +181,6 @@ class MinPool1d(torch.nn.MaxPool1d):
     >>> x = torch.randn(1, 1, 4)
     >>> pool(x)
     '''
-    def __init__(self, kernel_size, stride=None, padding=0, dilation=1, return_indices=False, ceil_mode=False):
-        super().__init__(kernel_size, stride, padding, dilation, return_indices, ceil_mode)
-
     def forward(self, input):
         '''Computes the min pool of `input`.
 
