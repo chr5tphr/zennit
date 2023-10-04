@@ -19,6 +19,7 @@
 import torch
 import torchvision
 
+
 class SubclassMeta(type):
     '''Meta class to bundle multiple subclasses.'''
     def __instancecheck__(cls, inst):
