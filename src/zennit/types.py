@@ -17,7 +17,7 @@
 # along with this library. If not, see <https://www.gnu.org/licenses/>.
 '''Type definitions for convenience.'''
 import torch
-
+import torchvision
 
 class SubclassMeta(type):
     '''Meta class to bundle multiple subclasses.'''
@@ -93,6 +93,7 @@ class BatchNorm(metaclass=SubclassMeta):
         torch.nn.modules.batchnorm.BatchNorm1d,
         torch.nn.modules.batchnorm.BatchNorm2d,
         torch.nn.modules.batchnorm.BatchNorm3d,
+        torchvision.ops.FrozenBatchNorm2d,
     )
 
 
