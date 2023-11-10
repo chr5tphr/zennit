@@ -6,6 +6,7 @@
     :maxdepth: 1
 
     image-classification-vgg-resnet
+    deep-kmeans
 ..
     image-segmentation-with-unet
     text-classification-with-tbd
