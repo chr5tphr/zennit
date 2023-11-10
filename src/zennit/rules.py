@@ -580,13 +580,54 @@ class MaxTakesMost2d(TakesMostBase):
     '''
     def max_fn(self, input, kernel_size, stride, padding, dilation):
         '''Computes the maximum value in a local window for each entry in the input tensor.'''
-        return torch.nn.functional.max_pool2d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
+        # return torch.nn.functional.max_pool2d(input, kernel_size, stride=stride, padding=padding, dilation=dilation)
+        return input.max().view(1,1,1,1)
 
     def sum_fn(self, input, kernel_size, stride, padding, dilation):
         '''Computes the sum of elements in a local window for each entry in the input tensor.'''
         in_channels = input.shape[1]
         if isinstance(kernel_size, int):
             kernel_size = (kernel_size, kernel_size)
+        if isinstance(stride, int):
+            stride = (stride, stride)
         kernel = torch.ones((in_channels, 1, *kernel_size), device=input.device)
-        return torch.nn.functional.conv2d(input, weight=kernel, stride=stride, padding=padding, dilation=dilation,
-                                          groups=in_channels)
+        summed_tensor = torch.nn.functional.conv2d(input, weight=kernel, stride=stride, padding=padding,
+                                                   dilation=dilation, groups=in_channels)
+        expanded_sum = torch.nn.functional.conv_transpose2d(summed_tensor, weight=kernel, stride=stride,
+                                                            padding=padding, dilation=dilation, groups=in_channels)
+        pad_height = input.shape[2] - expanded_sum.shape[2]
+        pad_width = input.shape[3] - expanded_sum.shape[3]
+        if pad_height > 0 or pad_width > 0:
+            expanded_sum = torch.nn.functional.pad(expanded_sum, (0, pad_width, 0, pad_height))
+
+        return expanded_sum
+
+    def backward(self, module, grad_input, grad_output):
+        '''Modifies the gradient based on the softmax-like weighting of input contributions.'''
+        stored_input = self.stored_tensors['input'][0]
+        if isinstance(module.stride, int):
+            stride = (module.stride, module.stride)
+        else:
+            stride = module.stride
+
+        kernel_size = module.kernel_size
+        padding = module.padding
+        dilation = module.dilation
+
+        max_val = self.max_fn(self.beta * stored_input, kernel_size, stride, padding, dilation)
+        exp_input = torch.exp(self.beta * stored_input - max_val)
+        summed_elements = self.sum_fn(exp_input, kernel_size, stride=stride, padding=padding, dilation=dilation)
+        softmax_output = exp_input / summed_elements
+        softmax_output[summed_elements == 0] = 0
+
+        in_channels = stored_input.shape[1]
+        kernel = torch.ones((in_channels, 1, kernel_size, kernel_size), device=stored_input.device)
+        expanded_grad_output = torch.nn.functional.conv_transpose2d(grad_output[0], weight=kernel, stride=stride,
+                                                                    padding=padding, dilation=dilation,
+                                                                    groups=in_channels)
+        pad_height = stored_input.shape[2] - expanded_grad_output.shape[2]
+        pad_width = stored_input.shape[3] - expanded_grad_output.shape[3]
+        if pad_height > 0 or pad_width > 0:
+            expanded_grad_output = torch.nn.functional.pad(expanded_grad_output, (0, pad_width, 0, pad_height))
+
+        return (softmax_output * expanded_grad_output,)
