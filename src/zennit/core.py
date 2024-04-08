@@ -350,8 +350,7 @@ def collect_leaves(module):
     children = module.children()
     for child in children:
         is_leaf = False
-        for leaf in collect_leaves(child):
-            yield leaf
+        yield from collect_leaves(child)
     if is_leaf:  # pragma: no branch
         yield module
 
