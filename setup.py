@@ -67,6 +67,7 @@ setup(
             'sphinxcontrib.datatemplates>=0.9.0',
             'sphinxcontrib.bibtex>=2.4.1',
             'nbsphinx>=0.8.8',
+            'nbconvert<7.14',  # see https://github.com/jupyter/nbconvert/issues/2092
             'ipykernel>=6.13.0',
         ],
         'tests': [
