@@ -132,8 +132,8 @@ class MergeBatchNorm(Canonizer):
 
         for module in modules:
             if module.bias is None:
-                object.__setattr__(
-                    module, 'bias', torch.zeros(1, device=module.weight.device, dtype=module.weight.dtype)
+                module.bias = torch.nn.Parameter(
+                    torch.zeros(1, device=module.weight.device, dtype=module.weight.dtype)
                 )
 
             index = (slice(None), *((None,) * (module.weight.ndim - 1)))
