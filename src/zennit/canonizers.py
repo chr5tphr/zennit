@@ -98,7 +98,8 @@ class MergeBatchNorm(Canonizer):
         self.linear_params = [(linear.weight, linear.bias) for linear in linears]
 
         self.batch_norm_params = {
-            key: getattr(self.batch_norm, key) for key in ('weight', 'bias', 'running_mean', 'running_var', 'eps')
+            key: getattr(self.batch_norm, key)
+            for key in ('weight', 'bias', 'running_mean', 'running_var', 'eps')
         }
 
         self.merge_batch_norm(self.linears, self.batch_norm)
@@ -132,8 +133,8 @@ class MergeBatchNorm(Canonizer):
 
         for module in modules:
             if module.bias is None:
-                object.__setattr__(
-                    module, 'bias', torch.zeros(1, device=module.weight.device, dtype=module.weight.dtype)
+                setattr(
+                   module, 'bias', torch.nn.Parameter(torch.zeros(1, device=module.weight.device, dtype=module.weight.dtype))
                 )
 
             index = (slice(None), *((None,) * (module.weight.ndim - 1)))
