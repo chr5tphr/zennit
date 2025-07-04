@@ -12,6 +12,7 @@ __pycache__
 # Setup output
 build/
 dist/
+version.py
 
 # Results output
 result

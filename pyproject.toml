@@ -1,0 +1,162 @@
+
+# The project's basic metadata and dependencies
+[project]
+
+# General project information, the Project supports Python 3.11, 3.12, and 3.13; the version of the project is automatically determined from the
+# latest Git tag using the Hatch-VCS plugin and the read me is dynamically generated using the Hatch Fancy PyPI Readme plugin (this  is necessary,
+# because Hatch cannot access the root directory of the repository while building the wheel, which is where the read me is located; Hatch first builds
+# the source distribution from the files in the project directory, from where it can access top-level repository files, and then builds the wheel from
+# the source distribution by extracting it into a temporary directory, from where it cannot access the top-level repository files)
+name = "zennit"
+description = """\
+Attribution of Neural Networks using PyTorch\
+    """
+keywords = [
+    "Feature Attribution",
+    "Explainable AI",
+    "XAI",
+    "Interpretability",
+    "Machine Learning",
+    "Deep Learning",
+    "Artificial Intelligence"
+]
+license = "GPL-3.0-or-later AND LGPL-3.0-or-later"
+requires-python = ">=3.11.12"
+dynamic = [
+    "readme",
+    "version"
+]
+
+# The maintainers (people actively working on the project) and authors (people who have contributed to the project)
+maintainers = [
+    {name = "Christopher J. Anders", email = "contact@cjanders.de"},
+]
+authors = [
+    {name = "Christopher J. Anders", email = "contact@cjanders.de"},
+    {name = "Sebastian Lapuschkin", email = "sebastian.lapuschkin@hhi.fraunhofer.de"},
+    {name = "Pattarawat Chormai", email = "pat.chormai@gmail.com"}
+]
+
+# The project's dependencies, which are included in the requirements of the published package
+dependencies = [
+    "click",
+    "numpy",
+    "Pillow",
+    "torch>=2.0.0,<3.0.0",
+    "torchvision",
+]
+
+# The PyPI classifiers that describe the project
+classifiers = [
+    "Natural Language :: English",
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    # "Typing :: Typed"
+]
+
+# The URLs to the documentation, the repository, the issue tracker, and the changelog
+[project.urls]
+Documentation = "https://zennit.readthedocs.io/en/latest/"
+Repository = "https://github.com/chr5tphr/zennit.git"
+Issues = "https://github.com/chr5tphr/zennit/issues"
+#Changelog = "https://github.com/chr5tphr/zennit/blob/main/CHANGELOG.md"
+
+# Groups of extra dependencies that are not included in the requirements of the published package, but users may install them optionally; installing
+# them provides additional functionality, but is not required to use the package
+[project.optional-dependencies]
+
+# Groups of development dependencies that are not included in the requirements of the published package; they can be installed separately or
+# all-in-one with the "dev" group, which includes all development dependencies
+[dependency-groups]
+
+# Dependencies required for development; this group includes all other groups
+dev = [
+    { include-group = "testing" },
+    { include-group = "linting" },
+    { include-group = "docs" }
+]
+
+# Extra dependencies of the project, which may be installed optionally when installing the package; these are needed for testing and linting (for the
+optional-dependencies = []
+
+# Dependencies required for testing
+testing = [
+    "coverage>=7.8.2,<8.0.0",
+    "pytest-cov>=6.1.1,<7.0.0",
+    "pytest>=8.4.0,<9.0.0",
+    "tox-uv>=1.26.0,<2.0.0",
+    "tox>=4.26.0,<5.0.0",
+    { include-group = "optional-dependencies" }
+]
+
+# Dependencies required for linting
+linting = [
+    "pycodestyle>=2.13.0,<3.0.0",
+    "pydoclint>=0.6.6,<1.0.0",
+    "pylint>=3.3.7,<4.0.0",
+    # "mypy>=1.16.0,<2.0.0",
+    # "pytest-mypy>=1.0.1,<2.0.0",
+    { include-group = "optional-dependencies" }
+]
+
+# Dependencies required for building the documentation (Pybtex is a dependency of the BibTeX extension for Sphinx, which is used to generate the
+# bibliography in the documentation; the version of Pybtex available on PyPI is 0.24.0, which is still using the deprecated "pkg_resources" module for
+# loading plugins; the problem has already been fixed in the development version, but it is not yet released; therefore, the development version is
+# installed directly from the Git repository; if and when a successor to 0.24.0 is released, this dependency can be removed)
+docs = [
+    "pybtex@git+https://bitbucket.org/pybtex-devs/pybtex@9b97822f5517fc7893456b9827589a003ea7076a",
+    "sphinx-copybutton>=0.5.2,<1.0.0",
+    "sphinx-rtd-theme>=3.0.2,<4.0.0",
+    "sphinx>=8.2.3,<9.0.0",
+    "sphinxcontrib.bibtex>=2.6.3,<3.0.0",
+    "sphinxcontrib.datatemplates>=0.11.0,<1.0.0",
+    "nbsphinx>=0.8.8,<1.0.0",
+    "nbconvert>=7.0.0,<7.14.0",
+    "ipython_genutils>=0.2.0,<1.0.0",
+    "ipykernel>=6.13.0,<7.0.0"
+]
+
+# Configures which build system is used by UV to build the project
+[build-system]
+requires = [
+    "hatch-fancy-pypi-readme>=25.1.0,<26.0.0",
+    "hatch-vcs>=0.5.0,<1.0.0",
+    "hatchling>=1.27.0,<2.0.0"
+]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["src"]
+
+# [tool.hatch.build.targets.sdist]
+# only-include = ["pkg"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zennit"]
+
+# Allows Hatch to install packages from Git repositories
+[tool.hatch.metadata]
+allow-direct-references = true
+
+# Configures the Hatch-VCS plugin that is used to dynamically determine the version of the project based on the current Git tag
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0"
+#raw-options = { root = ".." }
+
+# Configures the Hatch-VCS build hook, which is used to write the version of the project to the version file
+[tool.hatch.build.hooks.vcs]
+version-file = "src/zennit/version.py"
+
+# Configures the Hatch Fancy PyPI Readme plugin to compose the content of the read me file from the project's read me file, which is located in the
+# root directory of the repository
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"

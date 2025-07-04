@@ -235,7 +235,7 @@ def main(
             output, relevance = attributor(data_norm, output_relevance)
 
             # sum over the color channel for visualization
-            relevance = np.array(relevance.sum(1).detach().cpu())
+            relevance = relevance.sum(1).detach().cpu().numpy()
 
             # normalize between 0. and 1. given the specified strategy
             if relevance_norm == 'symmetric':

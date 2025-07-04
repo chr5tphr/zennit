@@ -1,0 +1,18 @@
+
+# The PyCodeStyle configuration
+[pycodestyle]
+
+# Sets the maximum line length for both code and docstrings to 120 characters
+max-line-length = 120
+max-doc-length = 120
+
+# Selects the specified list of errors and warnings to be enforced
+# W503: The line break should occur before a binary operator, which is in contrast to W504, which requires the line break to occur after a binary
+#       operator; we prefer W503
+select = W503
+
+# Ignores the specified list of errors and warnings
+# E731: Instead of assigning a lambda expression to a variable, it should be defined using the "def" keyword; it is, however, sometimes useful to
+#       assign a lambda expression to a variable, especially in the unit tests
+# E131: The continuation line is unaligned for hanging indentation; we do not use hanging indentation in the codebase
+ignore = E131,E731
