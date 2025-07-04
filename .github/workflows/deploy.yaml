@@ -1,0 +1,56 @@
+
+# This workflow will build the Zennit project and publish the artifacts to PyPI when a GitHub release is created
+name: Zennit Continuous Deployment
+
+# This workflow will run when a new release is created on GitHub, the process works like this:
+#   1) For each milestone multiple issues are created
+#   2) For each issue a new branch is branched off from the develop branch (which itself is branched off from main)
+#   3) When the issue is resolved, a pull request is created to merge the issue branch into the develop branch
+#   4) Once all issues for a milestone are resolved, a pull request is created to merge the develop branch into the main branch
+#   5) When the pull request is merged, a new release is created
+#   6) This workflow will then be triggered and the Zennit project will be built and published to PyPI
+on:
+  release:
+    types:
+      - created
+
+# This workflow contains a single job for building and publishing the Zennit project
+jobs:
+
+  # Builds and publishes the Zennit project
+  build-and-publish:
+
+    # The job will run on the latest version of Ubuntu
+    name: Build and Publish the Zennit Project
+    runs-on: ubuntu-latest
+
+    # Gives the job permission to write the ID token, which is required for trusted publishing; trusted publishing is a way to publish packages to a
+    # package index (like PyPI) without needing to store credentials in the repository; trusted publishing is set up beforehand and during the
+    # publishing step and allows the job to automatically authenticate with the package index to retrieve a JWT token for publishing the package; the
+    # write permission is allows GitHub to generate an OIDC token, which is used to authenticate with the package index and retrieve the JWT token
+    permissions:
+      id-token: write
+
+    # Specifies that we want to deploy to PyPI
+    environment:
+      name: pypi
+      url: https://pypi.org/p/zennit
+
+    # The job contains several steps: 1) checking out the repository, 2) installing the Python project management tool uv, 3) installing Python, 4)
+    # installing the dependencies of Zennit, 5) building the Zennit project, and 6) publishing the Zennit project
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: 0.6.13
+      - name: Install Python
+        run: uv python install 3.13.2
+      - name: Install Zennit and its Dependencies
+        run: uv sync
+      - name: Build the Zennit Project
+        run: uv build
+      - name: Publish the Zennit Project to PyPI
+        run: uv publish

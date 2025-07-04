@@ -1,0 +1,23 @@
+
+# The PyDocLint configuration
+[tool.pydoclint]
+
+style = 'numpy'
+
+# Normally, the class docstring would contain the documentation for the __init__ function, but we prefer to have a separate docstring for the __init__
+allow-init-docstring = true
+
+# Normally, the class docstring would contain the documentation for the class attributes, but we prefer to have separate docstrings for the attributes
+check-class-attributes = false
+
+# Short docstring should not be skipped, as the only reason they are short may be that they are missing sections
+skip-checking-short-docstrings = false
+
+arg-type-hints-in-signature = false
+arg-type-hints-in-docstring = true
+
+# zennit is currently not typed, so disable return type check
+check-return-types = false
+
+# zennit is currently not typed, so disable yield type check
+check-yield-types = false

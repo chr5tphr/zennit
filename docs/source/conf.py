@@ -17,7 +17,7 @@ import sys
 import os
 from subprocess import run, CalledProcessError
 import inspect
-import pkg_resources
+#import pkg_resources
 
 from pybtex.style.formatting.plain import Style as PlainStyle
 from pybtex.style.labels import BaseLabelStyle
@@ -182,7 +182,10 @@ def linkcode_resolve(domain, info):
             return None
 
     try:
-        modpath = pkg_resources.require(topmodulename)[0].location
+        module = sys.modules.get(topmodulename)
+        if module is None:
+            return None
+        modpath = os.path.abspath(os.path.join(os.path.dirname(module.__file__), '..'))
         filepath = os.path.relpath(inspect.getsourcefile(obj), modpath)
         if filepath is None:
             return
