@@ -284,7 +284,7 @@ class ParamMod:
         raise TypeError(f'{modifier} is neither an instance of {cls}, nor callable!')
 
     @contextmanager
-    def __call__(self, module) -> Generator[torch.nn.Module]:
+    def __call__(self, module) -> Generator:
         '''Context manager to temporarily modify parameter attributes (all by default) of a module.
 
         Parameters
