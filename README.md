@@ -1,5 +1,4 @@
-# Zennit
-![Zennit-Logo](share/img/zennit.png)
+<img alt="Zennit-Logo" src="share/img/zennit.png" width=500>
 
 [![Documentation Status](https://readthedocs.org/projects/zennit/badge/?version=latest)](https://zennit.readthedocs.io/en/latest/?badge=latest)
 [![tests](https://github.com/chr5tphr/zennit/actions/workflows/tests.yml/badge.svg)](https://github.com/chr5tphr/zennit/actions/workflows/tests.yml)
