@@ -19,6 +19,7 @@
 import functools
 import weakref
 from contextlib import contextmanager
+from typing import Generator, Iterator
 
 import torch
 
@@ -197,7 +198,7 @@ def zero_wrap(zero_params):
 
         Parameters
         ----------
-        func: function
+        modifier: function
             Function to wrap.
 
         Returns
@@ -283,7 +284,7 @@ class ParamMod:
         raise TypeError(f'{modifier} is neither an instance of {cls}, nor callable!')
 
     @contextmanager
-    def __call__(self, module):
+    def __call__(self, module) -> Generator[torch.nn.Module]:
         '''Context manager to temporarily modify parameter attributes (all by default) of a module.
 
         Parameters
@@ -332,7 +333,7 @@ class ParamMod:
                 object.__setattr__(module, key, value)
 
 
-def collect_leaves(module):
+def collect_leaves(module) -> Iterator[torch.nn.Module]:
     '''Generator function to collect all leaf modules of a module.
 
     Parameters
@@ -359,12 +360,38 @@ class Identity(torch.autograd.Function):
     '''Identity to add a grad_fn to a tensor, so a backward hook can be applied.'''
     @staticmethod
     def forward(ctx, *inputs):
-        '''Forward identity.'''
+        '''Forward identity.
+
+        Parameters
+        ----------
+        ctx: object
+            The function context.
+        *inputs: tuple of :py:obj:`torch.Tensor`
+            Inputs to forward.
+
+        Returns
+        -------
+        inputs: tuple of :py:obj:`torch.Tensor`
+            The unmodified inputs.
+        '''
         return inputs
 
     @staticmethod
     def backward(ctx, *grad_outputs):
-        '''Backward identity.'''
+        '''Backward identity.
+
+        Parameters
+        ----------
+        ctx: object
+            The function context.
+        *grad_outputs: tuple of :py:obj:`torch.Tensor`
+            Output gradients.
+
+        Returns
+        -------
+        grad_outputs: tuple of :py:obj:`torch.Tensor`
+            The unmodified output gradients.
+        '''
         return grad_outputs
 
 
@@ -376,7 +403,21 @@ class Hook:
         self.tensor_handles = RemovableHandleList()
 
     def pre_forward(self, module, input):
-        '''Apply an Identity to the input before the module to register a backward hook.'''
+        '''Apply an Identity to the input before the module to register a backward hook.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        input: :py:obj:`torch.Tensor`
+            The input tensor.
+
+        Returns
+        -------
+        tuple of :py:obj:`torch.Tensor`, optional
+            A tuple of the modified input tensors.
+
+        '''
         hook_ref = weakref.ref(self)
 
         @functools.wraps(self.backward)
@@ -405,7 +446,22 @@ class Hook:
         return post_input[0] if len(post_input) == 1 else post_input
 
     def post_forward(self, module, input, output):
-        '''Register a backward-hook to the resulting tensor right after the forward.'''
+        '''Register a backward-hook to the resulting tensor right after the forward.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        input: :py:obj:`torch.Tensor`
+            The input tensor.
+        output: :py:obj:`torch.Tensor`
+            The output tensor.
+
+        Returns
+        -------
+        tuple of :py:obj:`torch.Tensor`, optional
+            A tuple of the modified output tensors.
+        '''
         hook_ref = weakref.ref(self)
 
         @functools.wraps(self.pre_backward)
@@ -427,28 +483,76 @@ class Hook:
         return output[0] if len(output) == 1 else output
 
     def pre_backward(self, module, grad_input, grad_output):
-        '''Store the grad_output for the backward hook'''
+        '''Store the grad_output for the backward hook.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        grad_input: :py:obj:`torch.Tensor`
+            The input gradient tensor.
+        grad_output: :py:obj:`torch.Tensor`
+            The output gradient tensor.
+        '''
         self.stored_tensors['grad_output'] = grad_output
 
     def forward(self, module, input, output):
-        '''Hook applied during forward-pass'''
+        '''Hook applied during forward-pass.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        input: :py:obj:`torch.Tensor`
+            The input tensor.
+        output: :py:obj:`torch.Tensor`
+            The output tensor.
+        '''
 
     def backward(self, module, grad_input, grad_output):
-        '''Hook applied during backward-pass'''
+        '''Hook applied during backward-pass.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        grad_input: :py:obj:`torch.Tensor`
+            The input gradient tensor.
+        grad_output: :py:obj:`torch.Tensor`
+            The output gradient tensor.
+        '''
 
     def copy(self):
         '''Return a copy of this hook.
         This is used to describe hooks of different modules by a single hook instance.
+
+        Returns
+        -------
+        :py:obj:`BasicHook`
+            A copy of this hook.
+
         '''
         return self.__class__()
 
     def remove(self):
-        '''When removing hooks, remove all references to stored tensors'''
+        '''When removing hooks, remove all references to stored tensors.'''
         self.stored_tensors.clear()
         self.tensor_handles.remove()
 
     def register(self, module):
-        '''Register this instance by registering all hooks to the supplied module.'''
+        '''Register this instance by registering all hooks to the supplied module.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which to register to.
+
+        Returns
+        -------
+        :py:obj:`RemovableHandleList`
+            A list of removable handles, one for each registered hook.
+
+        '''
         return RemovableHandleList([
             RemovableHandle(self),
             module.register_forward_pre_hook(self.pre_forward),
@@ -486,6 +590,10 @@ class BasicHook(Hook):
         inputs and gradients produced through ``input_modifiers`` and ``param_modifiers``. ``inputs`` and ``gradients``
         have the same as ``input_modifiers`` and ``param_modifiers``. Default is the sum of the multiplications of each
         input and its corresponding gradient.
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
     '''
     def __init__(
         self,
@@ -518,11 +626,36 @@ class BasicHook(Hook):
         self.reducer = reducer
 
     def forward(self, module, input, output):
-        '''Forward hook to save module in-/outputs.'''
+        '''Forward hook to save module in-/outputs.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        input: :py:obj:`torch.Tensor`
+            The input tensor.
+        output: :py:obj:`torch.Tensor`
+            The output tensor.
+        '''
         self.stored_tensors['input'] = input
 
     def backward(self, module, grad_input, grad_output):
-        '''Backward hook to compute LRP based on the class attributes.'''
+        '''Backward hook to compute LRP based on the class attributes.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        grad_input: :py:obj:`torch.Tensor`
+            The input gradient tensor.
+        grad_output: :py:obj:`torch.Tensor`
+            The output gradient tensor.
+
+        Returns
+        -------
+        tuple of :py:obj:`torch.nn.Module`
+            The modified input gradient tensors.
+        '''
         original_input = self.stored_tensors['input'][0].clone()
         inputs = []
         outputs = []
@@ -546,6 +679,11 @@ class BasicHook(Hook):
     def copy(self):
         '''Return a copy of this hook.
         This is used to describe hooks of different modules by a single hook instance.
+
+        Returns
+        -------
+        :py:obj:`BasicHook`
+            A copy of this hook.
         '''
         copy = BasicHook.__new__(type(self))
         BasicHook.__init__(
@@ -572,7 +710,13 @@ class BasicHook(Hook):
 
 
 class RemovableHandle:
-    '''Create weak reference to call .remove on some instance.'''
+    '''Create weak reference to call .remove on some instance.
+
+    Parameters
+    ----------
+    instance: object
+        The instance to which to create the reference.
+    '''
     def __init__(self, instance):
         self.instance_ref = weakref.ref(instance)
 
@@ -688,9 +832,14 @@ class Composite:
         return CompositeContext(module, self)
 
     @contextmanager
-    def inactive(self):
+    def inactive(self) -> Generator[Composite]:
         '''Context manager to temporarily deactivate the gradient modification. This can be used to compute the
         gradient of the modified gradient.
+
+        Yields
+        ------
+        self: :py:obj:`Composite`
+            The instance of this composite.
         '''
         try:
             for hook in self.hook_refs:
@@ -702,5 +851,20 @@ class Composite:
 
     @staticmethod
     def _empty_module_map(ctx, name, module):
-        '''Empty module_map, does not assign any rules.'''
+        '''Empty module_map, does not assign any rules.
+
+        Parameters
+        ----------
+        ctx: dict
+            A dictionary containing an optional context.
+        name: str
+            The name of the module.
+        module: :py:obj:`torch.nn.Module`
+            The instance of the module.
+
+        Returns
+        -------
+        NoneType
+            Always `None`, as the empty module map will never register any hooks.
+        '''
         return None

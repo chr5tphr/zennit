@@ -130,6 +130,11 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, symmetric=False, gr
     -------
     image: obj:`PIL.Image`
         The array visualized as a Pillow Image.
+
+    Raises
+    ------
+    TypeError
+        If the shape of the array cannot be converted to an image.
     '''
     array = np.array(obj)
 
@@ -221,6 +226,11 @@ def gridify(obj, shape=None, fill_value=None):
     obj:`numpy.ndarray`
         An array with the 0-th dimension absorbed into the height and width dimensions (then 0 and 1).
         The color dimension will be the last dimension, even if it was the first dimension before.
+
+    Raises
+    ------
+    TypeError
+        If the shape of the array cannot be converted to an image.
     '''
     array = np.array(obj)
     if array.ndim not in (3, 4):

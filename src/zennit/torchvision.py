@@ -59,7 +59,20 @@ class ResNetBottleneckCanonizer(AttributeCanonizer):
 
     @staticmethod
     def forward(self, x):
-        '''Modified Bottleneck forward for ResNet.'''
+        '''Modified Bottleneck forward for ResNet.
+
+        Parameters
+        ----------
+        self: :py:obj:`torch.nn.Module`:
+            The module this abstract method will be bound to.
+        x: :py:obj:`torch.Tensor`:
+            The input tensor.
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`:
+            The resulting output tensor.
+        '''
         identity = x
 
         out = self.conv1(x)
@@ -116,7 +129,20 @@ class ResNetBasicBlockCanonizer(AttributeCanonizer):
 
     @staticmethod
     def forward(self, x):
-        '''Modified BasicBlock forward for ResNet.'''
+        '''Modified BasicBlock forward for ResNet.
+
+        Parameters
+        ----------
+        self: :py:obj:`torch.nn.Module`:
+            The module this abstract method will be bound to.
+        x: :py:obj:`torch.Tensor`:
+            The input tensor.
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`:
+            The resulting output tensor.
+        '''
         identity = x
 
         out = self.conv1(x)

@@ -22,11 +22,33 @@ import torch
 class SubclassMeta(type):
     '''Meta class to bundle multiple subclasses.'''
     def __instancecheck__(cls, inst):
-        """Implement isinstance(inst, cls) as subclasscheck."""
+        """Implement isinstance(inst, cls) as subclasscheck.
+
+        Parameters
+        ----------
+        inst: object
+            The instance to check.
+
+        Returns
+        -------
+        bool
+            True, if `inst` is an instance of `cls`.
+        """
         return cls.__subclasscheck__(type(inst))
 
     def __subclasscheck__(cls, sub):
-        """Implement issubclass(sub, cls) with by considering additional __subclass__ members."""
+        """Implement issubclass(sub, cls) with by considering additional __subclass__ members.
+
+        Parameters
+        ----------
+        sub: object
+            The type to check.
+
+        Returns
+        -------
+        bool
+            True, if `sub` is an instance of `cls`.
+        """
         candidates = cls.__dict__.get("__subclass__", tuple())
         return type.__subclasscheck__(cls, sub) or issubclass(sub, candidates)
 
