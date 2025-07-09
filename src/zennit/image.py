@@ -173,6 +173,10 @@ def imgify(obj, vmin=None, vmax=None, cmap='bwr', level=1.0, symmetric=False, gr
         else:
             dims = tuple(range(array.ndim))
 
+        # initialize vmin_ and vmax_, so they are never undefined
+        vmin_, vmax_ = None, None
+
+        # only compute bounds for vmin_ and vmax_ if we really need to
         if None in (vmin, vmax):
             vmin_, vmax_ = interval_norm_bounds(array, symmetric=symmetric, dim=dims)
 

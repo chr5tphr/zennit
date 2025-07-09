@@ -832,7 +832,7 @@ class Composite:
         return CompositeContext(module, self)
 
     @contextmanager
-    def inactive(self) -> Generator[Composite]:
+    def inactive(self) -> Generator:
         '''Context manager to temporarily deactivate the gradient modification. This can be used to compute the
         gradient of the modified gradient.
 
