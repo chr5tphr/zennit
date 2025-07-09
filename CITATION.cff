@@ -1,0 +1,67 @@
+
+cff-version: 1.2.0
+title: >-
+  Software for Dataset-wide XAI: From Local Explanations to
+  Global Insights with Zennit, CoRelAy, and ViRelAy
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Christopher J.
+    family-names: Anders
+    orcid: 'https://orcid.org/0000-0003-3295-8486'
+  - given-names: David
+    family-names: Neumann
+    orcid: 'https://orcid.org/0000-0003-1907-8329'
+  - given-names: Wojciech
+    family-names: Samek
+    orcid: 'https://orcid.org/0000-0002-6283-3265'
+  - given-names: Klaus-Robert
+    family-names: Müller
+    orcid: 'https://orcid.org/0000-0002-3861-7685'
+  - given-names: Sebastian
+    family-names: Lapuschkin
+    orcid: 'https://orcid.org/0000-0002-0762-7258'
+identifiers:
+  - type: doi
+    value: 10.48550/arXiv.2106.13200
+    description: arXiv Preprint
+  - type: url
+    value: 'https://arxiv.org/abs/2106.13200'
+    description: arXiv Preprint
+repository-code: 'https://github.com/virelay/corelay.git'
+url: 'https://corelay.readthedocs.io/en/latest/'
+abstract: >-
+  Deep Neural Networks (DNNs) are known to be strong
+  predictors, but their prediction strategies can rarely be
+  understood. With recent advances in Explainable Artificial
+  Intelligence (XAI), approaches are available to explore
+  the reasoning behind those complex models' predictions.
+  Among post-hoc attribution methods, Layer-wise Relevance
+  Propagation (LRP) shows high performance. For deeper
+  quantitative analysis, manual approaches exist, but
+  without the right tools they are unnecessarily labor
+  intensive. In this software paper, we introduce three
+  software packages targeted at scientists to explore model
+  reasoning using attribution approaches and beyond: (1)
+  Zennit - a highly customizable and intuitive attribution
+  framework implementing LRP and related approaches in
+  PyTorch, (2) CoRelAy - a framework to easily and quickly
+  construct quantitative analysis pipelines for dataset-wide
+  analyses of explanations, and (3) ViRelAy - a
+  web-application to interactively explore data,
+  attributions, and analysis results. With this, we provide
+  a standardized implementation solution for XAI, to
+  contribute towards more reproducibility in our field.
+keywords:
+  - Explainable Artificial Intelligence
+  - XAI
+  - Layer-Wise Relevance Propagation
+  - LRP
+  - Spectral Relevance Analysis
+  - SpRAy
+  - Zennit
+  - CoRelAy
+  - ViRelAy
+license: GPL-3.0-or-later AND LGPL-3.0-or-later
