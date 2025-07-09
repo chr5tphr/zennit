@@ -257,6 +257,51 @@ class ParamMod:
         self.zero_params = zero_params
         self.require_params = require_params
 
+    def state_dicts(self, module):
+        '''Returns a state_dict of the modified module parameters.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module for which parameters shall be modified.
+
+        Returns
+        -------
+        original_state: dict of :py:obj:`torch.Tensor`
+            The original, unmodified parameters.
+        modified_state: dict of :py:obj:`torch.Tensor`
+            The modified parameters.
+
+        Raises
+        ------
+        RuntimeError
+            If parameters are missing and `self.require_params` has been set to ``True``.
+        '''
+        param_keys = self.param_keys
+        zero_params = self.zero_params
+
+        if param_keys is None:
+            param_keys = [name for name, _ in module.named_parameters(recurse=False)]
+        if zero_params is None:
+            zero_params = []
+
+        missing = [key for key in param_keys if not hasattr(module, key)]
+        if self.require_params and missing:
+            missing_str = '\', \''.join(missing)
+            raise RuntimeError(f'Module {module} requires missing parameters: \'{missing_str}\'')
+
+        modifier = zero_wrap(zero_params)(self.modifier)
+
+        modified_state = {}
+        original_state = {}
+        for key in param_keys:
+            if key not in missing:
+                param = getattr(module, key)
+                if param is not None:
+                    original_state[key] = param.data
+                    modified_state[key] = modifier(param.data, key)
+        return original_state, modified_state
+
     @classmethod
     def ensure(cls, modifier):
         '''If ``modifier`` is an instance of ParamMod, return it as-is, if it is callable, create a new instance with
@@ -293,44 +338,19 @@ class ParamMod:
             Module of which to modify parameters. If `self.requires_params` is `True`, it must have all elements given
             in `self.param_keys` as attributes (attributes are allowed to be `None`, in which case they are ignored).
 
-        Raises
-        ------
-        RuntimeError
-            If `self.require_params` is `True` and `module` is missing an attribute listed in `self.param_keys`.
-
         Yields
         ------
         module: :py:obj:`torch.nn.Module`
             The `module` with appropriate parameters temporarily modified.
         '''
+        # assign empty dict, as either the following two functions may crash
+        original_state = {}
         try:
-            stored_params = {}
-            param_keys = self.param_keys
-            zero_params = self.zero_params
-
-            if param_keys is None:
-                param_keys = [name for name, _ in module.named_parameters(recurse=False)]
-            if zero_params is None:
-                zero_params = []
-
-            missing = [key for key in param_keys if not hasattr(module, key)]
-            if self.require_params and missing:
-                missing_str = '\', \''.join(missing)
-                raise RuntimeError(f'Module {module} requires missing parameters: \'{missing_str}\'')
-
-            modifier = zero_wrap(zero_params)(self.modifier)
-
-            for key in param_keys:
-                if key not in missing:
-                    param = getattr(module, key)
-                    if param is not None:
-                        stored_params[key] = param
-                        object.__setattr__(module, key, modifier(param.data, key))
-
+            original_state, modified_state = self.state_dicts(module)
+            module.load_state_dict(modified_state, strict=False, assign=True)
             yield module
         finally:
-            for key, value in stored_params.items():
-                object.__setattr__(module, key, value)
+            module.load_state_dict(original_state, strict=False, assign=True)
 
 
 def collect_leaves(module) -> Iterator[torch.nn.Module]:
