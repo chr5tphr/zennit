@@ -24,101 +24,6 @@ from pybtex.style.labels import BaseLabelStyle
 from pybtex.plugin import register_plugin
 
 
-# -- Project information -----------------------------------------------------
-project = 'zennit'
-copyright = '2021, chr5tphr'
-author = 'chr5tphr'
-
-
-# -- General configuration ---------------------------------------------------
-
-# Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
-extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.linkcode',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.extlinks',
-    'sphinx_rtd_theme',
-    'sphinx_copybutton',
-    'sphinxcontrib.datatemplates',
-    'sphinxcontrib.bibtex',
-    'nbsphinx',
-]
-
-
-def config_inited_handler(app, config):
-    os.makedirs(os.path.join(app.srcdir, app.config.generated_path), exist_ok=True)
-
-
-def setup(app):
-    app.add_config_value('REVISION', 'master', 'env')
-    app.add_config_value('generated_path', '_generated', 'env')
-    app.connect('config-inited', config_inited_handler)
-
-
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
-
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
-
-# interactive badges for binder and colab
-nbsphinx_prolog = r"""
-{% set docname = 'docs/source/' + env.doc2path(env.docname, base=False) %}
-
-.. raw:: html
-
-    <div class="admonition note">
-      This page was generated from
-      <a class="reference external" href="https://github.com/chr5tphr/zennit/blob/{{ env.config.REVISION }}/{{ docname|e }}">{{ docname|e }}</a>
-      <br />
-      Interactive online version:
-      <span style="white-space: nowrap;">
-        <a href="https://mybinder.org/v2/gh/chr5tphr/zennit/{{ env.config.REVISION|e }}?filepath={{ docname|e }}">
-            <img alt="launch binder" src="https://mybinder.org/badge_logo.svg" style="vertical-align:text-bottom">
-        </a>
-      </span>
-      <span style="white-space: nowrap;">
-        <a href="https://colab.research.google.com/github/chr5tphr/zennit/blob/{{ env.config.REVISION|e }}/{{ docname|e }}">
-            <img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom">
-        </a>
-      </span>
-    </div>
-"""
-
-# autosummary_generate = True
-
-copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
-copybutton_prompt_is_regexp = True
-copybutton_line_continuation_character = "\\"
-copybutton_here_doc_delimiter = "EOT"
-
-# -- Options for HTML output -------------------------------------------------
-
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-#
-html_theme = 'sphinx_rtd_theme'
-# html_theme = 'alabaster'
-
-html_favicon = '_static/favicon.svg'
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
-
-bibtex_bibfiles = ['bibliography.bib']
-bibtex_default_style = 'author_year_style'
-bibtex_reference_style = 'author_year'
-
-
 class AuthorYearLabelStyle(BaseLabelStyle):
     def format_labels(self, sorted_entries):
         for entry in sorted_entries:
@@ -146,15 +51,11 @@ def getrev():
     return revision
 
 
+# revision of the documentation
 REVISION = getrev()
 
-extlinks = {
-    'repo': (
-        f'https://github.com/chr5tphr/zennit/blob/{REVISION}/%s',
-        '%s'
-    )
-}
 
+# path for the linkcode plugin
 LINKCODE_URL = (
     f'https://github.com/chr5tphr/zennit/blob/{REVISION}'
     '/src/{filepath}#L{linestart}-L{linestop}'
@@ -200,3 +101,123 @@ def linkcode_resolve(domain, info):
         linestart, linestop = lineno, lineno + len(source) - 1
 
     return LINKCODE_URL.format(filepath=filepath, linestart=linestart, linestop=linestop)
+
+
+def config_inited_handler(app, config):
+    os.makedirs(os.path.join(app.srcdir, app.config.generated_path), exist_ok=True)
+
+
+def setup(app):
+    app.add_config_value('REVISION', 'master', 'env')
+    app.add_config_value('generated_path', '_generated', 'env')
+    app.connect('config-inited', config_inited_handler)
+
+
+# -- Project information -----------------------------------------------------
+project = 'zennit'
+copyright = '2025, chr5tphr'
+author = 'chr5tphr'
+
+
+# -- General configuration ---------------------------------------------------
+
+# Add any paths that contain templates here, relative to this directory.
+templates_path = ['_templates']
+html_static_path = ['_static']
+html_favicon = '_static/favicon.svg'
+#html_css_files = ['custom.css']
+
+# List of patterns, relative to source directory, that match files and
+# directories to ignore when looking for source files.
+# This pattern also affects html_static_path and html_extra_path.
+exclude_patterns = []
+
+# Add any Sphinx extension module names here, as strings. They can be
+# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
+# ones.
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.extlinks',
+    'sphinx.ext.linkcode',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.napoleon',
+    'sphinxcontrib.datatemplates',
+    'sphinxcontrib.bibtex',
+    'sphinx_copybutton',
+    'sphinx_rtd_theme',
+    'nbsphinx',
+]
+
+# autodoc configuration
+autodoc_class_signature = 'separated'
+autodoc_member_order = 'bysource'
+autodoc_typehints = 'both'
+autodoc_preserve_defaults = True
+# autosummary_generate = True
+
+# interactive badges for binder and colab
+nbsphinx_prolog = r"""
+{% set docname = 'docs/source/' + env.doc2path(env.docname, base=False) %}
+
+.. raw:: html
+
+    <div class="admonition note">
+      This page was generated from
+      <a class="reference external" href="https://github.com/chr5tphr/zennit/blob/{{ env.config.REVISION }}/{{ docname|e }}">{{ docname|e }}</a>
+      <br />
+      Interactive online version:
+      <span style="white-space: nowrap;">
+        <a href="https://mybinder.org/v2/gh/chr5tphr/zennit/{{ env.config.REVISION|e }}?filepath={{ docname|e }}">
+            <img alt="launch binder" src="https://mybinder.org/badge_logo.svg" style="vertical-align:text-bottom">
+        </a>
+      </span>
+      <span style="white-space: nowrap;">
+        <a href="https://colab.research.google.com/github/chr5tphr/zennit/blob/{{ env.config.REVISION|e }}/{{ docname|e }}">
+            <img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" style="vertical-align:text-bottom">
+        </a>
+      </span>
+    </div>
+"""
+
+copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
+copybutton_prompt_is_regexp = True
+copybutton_line_continuation_character = "\\"
+copybutton_here_doc_delimiter = "EOT"
+
+bibtex_bibfiles = ['bibliography.bib']
+bibtex_default_style = 'author_year_style'
+
+bibtex_reference_style = 'author_year'
+# Configures the sphinx.ext.intersphinx plugin, which allows the documentation to link to the Sphinx documentation of
+# other projects; Sphinx defaults to automatically resolve unresolved labels using the Intersphinx mappings; this
+# behavior has unintended side-effects, namely that documentations local references can suddenly resolve to an external
+# location; therefore, the intersphinx_disabled_reftypes config value is set to ["*"], which disables the automatic
+# resolution of unresolved labels using the Intersphinx mappings; this is recommended by the Read the Docs
+# documentation
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable', None),
+    'torch': ('https://docs.pytorch.org/docs/stable', None),
+    'torchvision': ('https://docs.pytorch.org/vision/stable', None),
+    'click': ('https://click.palletsprojects.com/en/stable/', None),
+    'Pillow': ('https://pillow.readthedocs.io/en/stable/', None),
+}
+intersphinx_disabled_reftypes = ["*"]
+
+# path for the extlinks plugin
+extlinks = {
+    'repo': (
+        f'https://github.com/chr5tphr/zennit/blob/{REVISION}/%s',
+        '%s'
+    )
+}
+
+html_context = {
+  'display_github': True,
+  'github_user': 'chr5tphr',
+  'github_repo': 'zennit',
+  'github_version': f'{REVISION}/docs/source/',
+}
+html_theme = 'sphinx_rtd_theme'
