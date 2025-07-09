@@ -76,8 +76,20 @@ class ColorMap:
         return self._source
 
     @source.setter
-    def source(self, value: str):
-        '''Set source code property and re-compile the color map.'''
+    def source(self, value):
+        '''Set source code property and re-compile the color map.
+
+        Parameters
+        ----------
+        value : str
+            The code for the color map.
+
+        Raises
+        ------
+        RuntimeError
+            If the compilation failed, usually due to errors in the code.
+
+        '''
         try:
             tokens = self._lex(value)
             nodes = self._parse(tokens)
@@ -89,12 +101,40 @@ class ColorMap:
 
     @staticmethod
     def _lex(string):
-        '''Lexical scanning of cmsl using regular expressions.'''
+        '''Lexical scanning of cmsl using regular expressions.
+
+        Parameters
+        ----------
+        string : str
+            String to scan.
+
+        Returns
+        -------
+        list of `CMapToken`
+            The resulting tokens.
+
+        '''
         return [CMapToken(match.lastgroup, match.group(), match.start()) for match in ColorMap._rexp.finditer(string)]
 
     @staticmethod
     def _parse(tokens):
-        '''Parse cmsl tokens into a list of color nodes.'''
+        '''Parse cmsl tokens into a list of color nodes.
+
+        Parameters
+        ----------
+        tokens : list of `CMapToken
+            A list of scanned cmsl tokens.
+
+        Returns
+        -------
+        list of `ColorNode`
+            The identified color nodes.
+
+        Raises
+        ------
+        RuntimeError
+            If there was an unexpected token.
+        '''
         nodes = []
         log = []
         for token in tokens:
@@ -129,7 +169,26 @@ class ColorMap:
 
     @staticmethod
     def _make_palette(nodes):
-        '''Generate color map indices and colors from a list of color nodes.'''
+        '''Generate color map indices and colors from a list of color nodes.
+
+        Parameters
+        ----------
+        nodes : list of `ColorNode`
+            The color nodes which identify the color map.
+
+        Returns
+        -------
+        indices : :py:obj:`numpy.ndarray`
+            An array of shape N x 3, where 3 is the number of color nodes, containing the RGB colors.
+        colors : :py:obj:`numpy.ndarray`
+            An array of shape N of type ``numpy.uint8``, which are the indices of the color nodes.
+
+        Raises
+        ------
+        RuntimeError
+            If there are less than 2 colors in the color map.
+
+        '''
         if len(nodes) < 2:
             raise RuntimeError("ColorMap needs at least 2 colors!")
         result = []

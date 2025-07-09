@@ -53,7 +53,14 @@ class Canonizer(metaclass=ABCMeta):
         '''Revert the changes introduces by this canonizer.'''
 
     def copy(self):
-        '''Return a copy of this instance.'''
+        '''Return a copy of this instance.
+
+        Returns
+        -------
+        :py:obj:`Canonizer`
+            A copy of this canonizer.
+
+        '''
         return self.__class__()
 
 
@@ -79,7 +86,7 @@ class MergeBatchNorm(Canonizer):
 
         Parameters
         ----------
-        linear: list of :py:obj:`torch.nn.Module`
+        linears: list of :py:obj:`torch.nn.Module`
             List of linear layer with mandatory attributes `weight` and `bias`.
         batch_norm: :py:obj:`torch.nn.Module`
             Batch Normalization module with mandatory attributes
@@ -265,8 +272,8 @@ class AttributeCanonizer(Canonizer):
         '''Overload the module's attributes.
 
         Parameters
-        ---------
-        module : :py:obj:`torch.nn.Module`
+        ----------
+        module: :py:obj:`torch.nn.Module`
             The module of which the attributes will be overloaded.
         attributes : dict
             The attributes which to overload for the module.

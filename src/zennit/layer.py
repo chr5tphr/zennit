@@ -32,5 +32,17 @@ class Sum(torch.nn.Module):
         self.dim = dim
 
     def forward(self, input):
-        '''Computes the sum along a dimension.'''
+        '''Computes the sum along a dimension.
+
+        Parameters
+        ----------
+        input: :py:obj:`torch.Tensor`
+            The input on which to sum.
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`
+            The resulting tensor summed along dimension `dim`.
+
+        '''
         return torch.sum(input, dim=self.dim)

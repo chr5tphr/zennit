@@ -52,7 +52,7 @@ class ClampMod(ParamMod):
         Minimum float value for which the parameters should be clamped, or None if no clamping should be done.
     max: float or None, optional
         Maximum float value for which the parameters should be clamped, or None if no clamping should be done.
-    kwargs: dict[str, object]
+    **kwargs: dict[str, object]
         Additional keyword arguments used for :py:class:`ParamMod`.
     '''
     def __init__(self, min=None, max=None, **kwargs):
@@ -73,7 +73,7 @@ class GammaMod(ParamMod):
         Minimum float value for which the parameters should be clamped, or None if no clamping should be done.
     max: float or None, optional
         Maximum float value for which the parameters should be clamped, or None if no clamping should be done.
-    kwargs: dict[str, object]
+    **kwargs: dict[str, object]
         Additional keyword arguments used for :py:class:`ParamMod`.
     '''
     def __init__(self, gamma=0.25, min=None, max=None, **kwargs):
@@ -87,7 +87,7 @@ class NoMod(ParamMod):
 
     Parameters
     ----------
-    kwargs: dict[str, object]
+    **kwargs: dict[str, object]
         Additional keyword arguments used for :py:class:`ParamMod`.
     '''
     def __init__(self, **kwargs):
@@ -230,6 +230,11 @@ class AlphaBeta(BasicHook):
     zero_params: list[str], optional
         A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
 
+    Raises
+    ------
+    ValueError
+        If `alpha` and `beta` do not sum to one, or are negative.
+
     '''
     def __init__(self, alpha=2., beta=1., stabilizer=1e-6, zero_params=None):
         if alpha < 0 or beta < 0:
@@ -323,7 +328,22 @@ class Pass(Hook):
     passes upper layer relevance through to the lower layer.
     '''
     def backward(self, module, grad_input, grad_output):
-        '''Pass through the upper gradient, skipping the one for this layer.'''
+        '''Pass through the upper gradient, skipping the one for this layer.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        grad_input: :py:obj:`torch.Tensor`
+            The input gradient tensor.
+        grad_output: :py:obj:`torch.Tensor`
+            The output gradient tensor.
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`
+            The unmodified `grad_output`.
+        '''
         return grad_output
 
 
@@ -332,6 +352,13 @@ class Norm(BasicHook):
     This is essentially the same as the LRP :py:class:`~zennit.rules.Epsilon` rule :cite:p:`bach2015pixel` with a fixed
     epsilon only used as a stabilizer, and without the need of the attached layer to have parameters ``weight`` and
     ``bias``.
+
+    Parameters
+    ----------
+    stabilizer: callable or float, optional
+        Stabilization parameter. If ``stabilizer`` is a float, it will be added to the denominator with the same sign
+        as each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected,
+        of which the output corresponds to the stabilized denominator.
     '''
     def __init__(self, stabilizer=1e-6):
         stabilizer_fn = Stabilizer.ensure(stabilizer)
@@ -400,14 +427,44 @@ class Flat(BasicHook):
 class ReLUDeconvNet(Hook):
     '''DeconvNet ReLU rule :cite:p:`zeiler2014visualizing`.'''
     def backward(self, module, grad_input, grad_output):
-        '''Modify ReLU gradient according to DeconvNet :cite:p:`zeiler2014visualizing`.'''
+        '''Modify ReLU gradient according to DeconvNet :cite:p:`zeiler2014visualizing`.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        grad_input: :py:obj:`torch.Tensor`
+            The input gradient tensor.
+        grad_output: :py:obj:`torch.Tensor`
+            The output gradient tensor.
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`
+            The modified `grad_output`.
+        '''
         return (grad_output[0].clamp(min=0),)
 
 
 class ReLUGuidedBackprop(Hook):
     '''GuidedBackprop ReLU rule :cite:p:`springenberg2015striving`.'''
     def backward(self, module, grad_input, grad_output):
-        '''Modify ReLU gradient according to GuidedBackprop :cite:p:`springenberg2015striving`.'''
+        '''Modify ReLU gradient according to GuidedBackprop :cite:p:`springenberg2015striving`.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        grad_input: :py:obj:`torch.Tensor`
+            The input gradient tensor.
+        grad_output: :py:obj:`torch.Tensor`
+            The output gradient tensor.
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`
+            The modified `grad_output`.
+        '''
         return (grad_input[0] * (grad_output[0] > 0.),)
 
 
@@ -426,13 +483,44 @@ class ReLUBetaSmooth(Hook):
         self.beta_smooth = beta_smooth
 
     def copy(self):
-        '''Return a copy of this hook with the same beta parameter.'''
+        '''Return a copy of this hook with the same beta parameter.
+
+        Returns
+        -------
+        ReLUBetaSmooth
+            A copy of this hook.
+        '''
         return self.__class__(beta_smooth=self.beta_smooth)
 
     def forward(self, module, input, output):
-        '''Remember the input for the backward pass.'''
+        '''Remember the input for the backward pass.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        input: :py:obj:`torch.Tensor`
+            The input tensor.
+        output: :py:obj:`torch.Tensor`
+            The output tensor.
+        '''
         self.stored_tensors['input'] = input
 
     def backward(self, module, grad_input, grad_output):
-        '''Modify ReLU gradient to the smooth softplus gradient :cite:p:`dombrowski2019explanations`.'''
+        '''Modify ReLU gradient to the smooth softplus gradient :cite:p:`dombrowski2019explanations`.
+
+        Parameters
+        ----------
+        module: :py:obj:`torch.nn.Module`
+            The module to which this hook is attached.
+        grad_input: :py:obj:`torch.Tensor`
+            The input gradient tensor.
+        grad_output: :py:obj:`torch.Tensor`
+            The output gradient tensor.
+
+        Returns
+        -------
+        :py:obj:`torch.Tensor`
+            The modified `grad_output`.
+        '''
         return (torch.sigmoid(self.beta_smooth * self.stored_tensors['input'][0]) * grad_output[0],)

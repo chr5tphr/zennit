@@ -220,9 +220,33 @@ COMPOSITES = {}
 
 
 def register_composite(name):
-    '''Register a composite in the global COMPOSITES dict under `name`.'''
+    '''Register a composite in the global COMPOSITES dict under `name`.
+
+    Parameters
+    ----------
+    name: str
+        Name under which to register the composite.
+
+    Returns
+    -------
+    wrapped: function
+        The function which will register the composite under the specified name.
+
+    '''
     def wrapped(composite):
-        '''Wrapped function to be called on the composite to register it to the global COMPOSITES dict.'''
+        '''Wrapped function to be called on the composite to register it to the global COMPOSITES dict.
+
+        Parameters
+        ----------
+        composite: :py:obj:`Composite`
+            The composite to register.
+
+        Returns
+        -------
+        composite: :py:obj:`Composite`
+            The original composite.
+
+        '''
         COMPOSITES[name] = composite
         return composite
     return wrapped
@@ -528,6 +552,10 @@ class ExcitationBackprop(LayerMapComposite):
 
     Parameters
     ----------
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
     layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
         A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
         the ``layer_map`` defined by the composite.

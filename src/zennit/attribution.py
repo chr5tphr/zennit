@@ -50,8 +50,8 @@ def identity(obj):
     obj : object
         Any object which will be returned.
 
-    Result
-    ------
+    Returns
+    -------
     obj : object
         The original input argument ``obj``.
 
@@ -137,6 +137,18 @@ class Attributor(metaclass=ABCMeta):
     def __exit__(self, exc_type, exc_value, traceback):
         '''Remove the composite, if provided.
 
+        Parameters
+        ----------
+        exc_type : type or None
+            The type of the exception that caused the context to be exited.
+            `None` if the context was exited without an exception.
+        exc_value : Exception or None
+            The exception instance that caused the context to be exited.
+            `None` if the context was exited without an exception.
+        traceback : TracebackType or None
+            The traceback object associated with the exception.
+            `None` if the context was exited without an exception.
+
         Returns
         -------
         False
@@ -197,7 +209,7 @@ class Attributor(metaclass=ABCMeta):
         ----------
         input: :py:obj:`torch.Tensor`
             Input for the model, and wrt. compute the attribution
-        attr_output: :py:obj:`torch.Tensor` or callable, optional
+        attr_output_fn: :py:obj:`torch.Tensor` or callable, optional
             The output attribution function of the model's output.
         '''
 
@@ -240,7 +252,7 @@ class Gradient(Attributor):
         ----------
         input: :py:obj:`torch.Tensor`
             Input for the model.
-        attr_output: :py:obj:`torch.Tensor` or callable, optional
+        attr_output_fn: :py:obj:`torch.Tensor` or callable, optional
             The output attribution function of the model's output.
 
         Returns
@@ -342,7 +354,7 @@ class SmoothGrad(Gradient):
         ----------
         input: :py:obj:`torch.Tensor`
             Input for the model, and wrt. compute the attribution.
-        attr_output: :py:obj:`torch.Tensor` or callable, optional
+        attr_output_fn: :py:obj:`torch.Tensor` or callable, optional
             The output attribution function of the model's output.
 
         Returns
@@ -437,7 +449,7 @@ class IntegratedGradients(Gradient):
         ----------
         input: :py:obj:`torch.Tensor`
             Input for the model, and wrt. compute the attribution.
-        attr_output: :py:obj:`torch.Tensor` or callable, optional
+        attr_output_fn: :py:obj:`torch.Tensor` or callable, optional
             The output attribution function of the model's output.
 
         Returns
@@ -493,6 +505,11 @@ class Occlusion(Attributor):
         the window will only stride over the n-last dimensions, where n is the length of the tuple.
         `stride` must have the same length as `window`.
 
+    Raises
+    ------
+    TypeError
+        If the type of `window` or `stride` is wrong.
+
     '''
     def __init__(self, model, composite=None, attr_output=None, occlusion_fn=None, window=8, stride=8):
         def typecheck(obj):
@@ -535,7 +552,7 @@ class Occlusion(Attributor):
         ----------
         input: :py:obj:`torch.Tensor`
             Input for the model, and wrt. compute the attribution.
-        attr_output: :py:obj:`torch.Tensor` or callable, optional
+        attr_output_fn: :py:obj:`torch.Tensor` or callable, optional
             The output attribution function of the model's output.
 
         Returns
