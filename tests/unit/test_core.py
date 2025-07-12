@@ -1,11 +1,11 @@
 '''Tests for core functionality in zennit.core.'''
-from itertools import product, islice
+from itertools import product, islice, compress, repeat
 
 import torch
 import pytest
 from helpers import nograd, prodict
 
-from zennit.core import stabilize, expand, ParamMod, collect_leaves, Stabilizer
+from zennit.core import stabilize, expand, ParamMod, collect_leaves, Stabilizer, uncompress
 from zennit.core import Identity, Hook, BasicHook, RemovableHandle, RemovableHandleList, Composite
 
 
@@ -132,6 +132,19 @@ def test_expand_shape_invalid(input_shape, target_shape):
     input = torch.zeros(input_shape)
     with pytest.raises(RuntimeError):
         expand(input, target_shape)
+
+
+@pytest.mark.parametrize('length,modulo', [
+    *product([2, 3, 4, 5], [1, 2, 3])
+])
+def test_uncompress(length, modulo):
+    data = list(range(length))
+    selector = [bool(i % modulo) for i in data]
+    compressed = list(compress(data, selector))
+    recovered = list(uncompress(data, selector, compressed))
+    assert data == recovered
+    inflated = list(uncompress(repeat(None), selector, compressed))
+    assert all(i is None or bool(i % modulo) for i in inflated) and len(inflated) == len(data)
 
 
 @pytest.mark.parametrize('param_keys,require_params,zero_params,bias', [
@@ -402,12 +415,43 @@ def test_hook_tuple():
     '''Test whether pre- and post_forward handle non-tuple inputs and tuple outputs.'''
     hook = Hook()
     module = None
-    data = torch.ones(2)
+    data = torch.ones(2, requires_grad=True)
+    args = (data,)
+    kwargs = {}
 
-    pre_out = hook.pre_forward(module, data)
-    assert pre_out is data
-    post_out = hook.post_forward(module, data, (data,))
-    assert post_out is data
+    pre_out, _ = hook.pre_forward(module, args, kwargs)
+    # they are not identical, because pre_forward will add in an identity node
+    assert torch.allclose(pre_out[0], data)
+    post_out = hook.post_forward(module, args, kwargs, (data,))
+    # they not are identical, because post_forward will also add in an identity node
+    assert torch.allclose(post_out[0], data)
+
+
+def test_hook_kwargs():
+    '''Test whether Hook is properly called with kwargs in forward signature.'''
+    called = set()
+
+    data = torch.randn(1, 2, requires_grad=True)
+    linear = torch.nn.Linear(2, 2)
+
+    class DummyHook(Hook):
+        '''Dummy subclass of Hook to check whether forward and backward are called.'''
+        def forward(self, module, args, kwargs, output):
+            '''Check whether forward is called.'''
+            called.add('forward')
+
+        def backward(self, module, grad_input, grad_output):
+            '''Check whether backward is called.'''
+            called.add('backward')
+
+    hook = DummyHook()
+    handles = hook.register(linear)
+    try:
+        torch.autograd.grad(linear(data).sum(), data)
+        assert 'forward' in called
+        assert 'backward' in called
+    finally:
+        handles.remove()
 
 
 def test_basic_hook_default():
