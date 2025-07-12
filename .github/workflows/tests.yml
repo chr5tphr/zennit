@@ -142,7 +142,7 @@ jobs:
           version: 0.6.14
       - name: Install Python
         run: uv python install 3.13.3
-      - name: Install TeX Live for Pybtex
-        run: sudo apt-get update -y && sudo apt-get install -y texlive texlive-latex-extra dvipng
+      - name: Install TeX Live for Pybtex and Pandoc for nbsphinx
+        run: sudo apt-get update -y && sudo apt-get install -y texlive texlive-latex-extra dvipng pandoc
       - name: Build Documentation
-        run: uv run tox run --notest -e docs
+        run: uv run tox run -e docs
