@@ -132,9 +132,7 @@ class MergeBatchNorm(Canonizer):
 
         for module in modules:
             if module.bias is None:
-                module.bias = torch.nn.Parameter(
-                    torch.zeros(1, device=module.weight.device, dtype=module.weight.dtype)
-                )
+                module.bias = torch.nn.Parameter(torch.zeros_like(batch_norm.bias))
 
             index = (slice(None), *((None,) * (module.weight.ndim - 1)))
             if isinstance(module, ConvolutionTranspose):
