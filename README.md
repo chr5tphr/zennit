@@ -42,10 +42,10 @@ To install directly from PyPI using pip, use:
 $ pip install zennit
 ```
 
-Alternatively, install from a manually cloned repository to try out the examples:
+Alternatively, clone the repository and install with `uv`:
 ```shell
-$ git clone https://github.com/chr5tphr/zennit.git
-$ pip install ./zennit
+$ git clone https://github.com/chr5tphr/zennit.git && cd zennit
+$ uv sync
 ```
 
 ## Usage
