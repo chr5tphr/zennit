@@ -1,5 +1,5 @@
 # This workflow will run the unit tests, the linters, the static type checker, the spell checker, and will build the documentation
-name: Zennit Continuous Integration
+name: Tests, Linter, Docs
 
 # This workflow runs when commits are pushed to the main/develop branch or when a pull request for the main/develop branch is opened or pushed to
 on:
