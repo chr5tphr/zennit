@@ -1,0 +1,51 @@
+# This workflow will generate heatmaps to benchmark whether the current implementation is correct.
+name: Heatmap Benchmark
+
+# This workflow runs when commits are pushed to the main/develop branch or when a pull request for the main branch is opened or pushed to
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# This workflow computes VGG16 heatmaps and outputs them as an image montage.
+jobs:
+  benchmark:
+    name: Create Heatmap Overview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install ImageMagick
+        run: sudo apt-get update -y && sudo apt-get install -y libpng-dev libjpeg-dev libtiff-dev imagemagick
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: 0.6.14
+      - name: Install Python
+        run: uv python install 3.13.3
+      - name: Install Zennit and its Dependencies
+        run: uv sync --dev
+      - name: Prepare directories
+        run: mkdir data params results
+      - name: Download lighthouse data
+        run: bash share/scripts/download-lighthouses.sh --output data/lighthouses
+      - name: Download VGG16 model parameters
+        run: curl -o params/vgg16-397923af.pth 'https://download.pytorch.org/models/vgg16-397923af.pth'
+      - name: Run heatmap benchmark
+        run: |
+          bash share/scripts/heatmap-benchmark.sh \
+            --python .venv/bin/python \
+            --script share/example/feed_forward.py \
+            --output results
+      - name: Upload heatmap overview artifact
+        id: artifact-upload-step
+        uses: actions/upload-artifact@v4
+        with:
+          path: results/full_montage_vgg16.webp
+      - name: Heatmap Overview
+        run: echo "Heatmaps available <a href=\"${{steps.artifact-upload-step.outputs.artifact-url}}\">here</a> " >> "$GITHUB_STEP_SUMMARY"

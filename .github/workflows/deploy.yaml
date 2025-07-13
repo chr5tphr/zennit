@@ -1,6 +1,6 @@
 
 # This workflow will build the Zennit project and publish the artifacts to PyPI when a GitHub release is created
-name: Zennit Continuous Deployment
+name: Deployment
 
 # This workflow will run when a new release is created on GitHub, the process works like this:
 #   1) For each milestone multiple issues are created
