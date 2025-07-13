@@ -24,14 +24,15 @@ Category: Short subject describing changes (50 characters or less)
     - `Package` for package-related changes, e.g. in setup.py
 ```
 
-We recommend to not use `-m` for committing, as this often results in very short commit messages.
+We recommend to **not** use `-m` for committing, as this often results in very short commit messages.
 
 ## Code Style
 We use [PEP8](https://www.python.org/dev/peps/pep-0008) with a line-width of 120 characters. For
 docstrings we use [numpydoc](https://numpydoc.readthedocs.io/en/latest/format.html).
 
-We use [`flake8`](https://pypi.org/project/flake8/) for quick style checks and
-[`pylint`](https://pypi.org/project/pylint/) for thorough style checks.
+We use [`pycodestyle`](https://pypi.org/project/pycodestyle/) for quick style checks,
+[`pylint`](https://pypi.org/project/pylint/) for thorough style checks, and
+[`pydoclint`](https://pypi.org/project/pydoclint/) to lint docstrings.
 
 ## Testing
 Tests are written using [Pytest](https://docs.pytest.org) and executed
@@ -48,6 +49,11 @@ The documentation uses [Sphinx](https://www.sphinx-doc.org). It can be built at
 documentation, `tox -e docs -- -aE` can be used.
 
 The API-documentation is generated from the numpydoc-style docstring of respective modules/classes/functions.
+
+## Build Tools
+We use [`uv`](https://docs.astral.sh/uv/) with [`hatchling`](https://pypi.org/project/hatchling/).
+While development can be done only using `venv` and `pip`, we recommend the use of `uv`.
+We use `pyproject.toml` with a `src` directory.
 
 ### Tutorials
 Tutorials are written as Jupyter notebooks in order to execute them using
