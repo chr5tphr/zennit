@@ -24,11 +24,11 @@ jobs:
       matrix:
         include:
           - tox-environment: py311
-            python-version: "3.11.12"
+            python-version: "3.11.11"
           - tox-environment: py312
-            python-version: "3.12.10"
+            python-version: "3.12.9"
           - tox-environment: py313
-            python-version: "3.13.3"
+            python-version: "3.13.2"
 
     # The job contains several steps: 1) checking out the repository, 2) installing the Python project management tool uv, 3) installing the correct
     # Python version, 4) setting up the test environment by installing Zennit and its dependencies, and finally 5) running the unit tests
@@ -66,7 +66,7 @@ jobs:
         with:
           version: 0.6.14
       - name: Install Python
-        run: uv python install 3.13.3
+        run: uv python install 3.13.2
       - name: Install Zennit and its Dependencies
         run: uv sync --dev
       - name: Run PyLint Linter
@@ -90,7 +90,7 @@ jobs:
         with:
           version: 0.6.14
       - name: Install Python
-        run: uv python install 3.13.3
+        run: uv python install 3.13.2
       - name: Install Zennit and its Dependencies
         run: uv sync --dev
       - name: Run PyCodeStyle
@@ -114,7 +114,7 @@ jobs:
         with:
           version: 0.6.14
       - name: Install Python
-        run: uv python install 3.13.3
+        run: uv python install 3.13.2
       - name: Install Zennit and its Dependencies
         run: uv sync --dev
       - name: Run PyDocLint
@@ -141,7 +141,7 @@ jobs:
         with:
           version: 0.6.14
       - name: Install Python
-        run: uv python install 3.13.3
+        run: uv python install 3.13.2
       - name: Install TeX Live for Pybtex and Pandoc for nbsphinx
         run: sudo apt-get update -y && sudo apt-get install -y texlive texlive-latex-extra dvipng pandoc
       - name: Build Documentation

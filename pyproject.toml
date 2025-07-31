@@ -21,7 +21,7 @@ keywords = [
     "Artificial Intelligence"
 ]
 license = "GPL-3.0-or-later AND LGPL-3.0-or-later"
-requires-python = ">=3.11.12"
+requires-python = ">=3.11.11"
 dynamic = [
     "readme",
     "version"
