@@ -16,18 +16,15 @@ structure (including activation functions).
 Zennit is currently under active development, but should be mostly stable.
 
 If you find Zennit useful for your research, please consider citing our related
-[paper](https://arxiv.org/abs/2106.13200):
+[paper](https://doi.org/10.1371/journal.pone.0336683):
 ```
-@article{anders2021software,
-      author  = {Anders, Christopher J. and
-                 Neumann, David and
-                 Samek, Wojciech and
-                 Müller, Klaus-Robert and
-                 Lapuschkin, Sebastian},
-      title   = {Software for Dataset-wide XAI: From Local Explanations to Global Insights with {Zennit}, {CoRelAy}, and {ViRelAy}},
-      journal = {CoRR},
-      volume  = {abs/2106.13200},
-      year    = {2021},
+@article{anders2026software,
+  title = {Software for Dataset-Wide {{XAI}}: {{From}} Local Explanations to Global Insights with {{Zennit}}, {{CoRelAy}}, and {{ViRelAy}}},
+  author = {Anders, Christopher J. and Neumann, David and Samek, Wojciech and M{\"u}ller, Klaus-Robert and Lapuschkin, Sebastian},
+  year = {2026},
+  journal = {PLOS ONE},
+  doi = {10.1371/journal.pone.0336683},
+  url = {https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0336683}
 }
 ```
 

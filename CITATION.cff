@@ -25,35 +25,39 @@ authors:
     orcid: 'https://orcid.org/0000-0002-0762-7258'
 identifiers:
   - type: doi
-    value: 10.48550/arXiv.2106.13200
-    description: arXiv Preprint
+    value: 10.1371/journal.pone.0336683
   - type: url
-    value: 'https://arxiv.org/abs/2106.13200'
-    description: arXiv Preprint
-repository-code: 'https://github.com/virelay/corelay.git'
-url: 'https://corelay.readthedocs.io/en/latest/'
+    value: 'https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0336683'
+repository-code: 'https://github.com/chr5tphr/zennit.git'
+url: 'https://zennit.readthedocs.io/en/latest/'
 abstract: >-
-  Deep Neural Networks (DNNs) are known to be strong
-  predictors, but their prediction strategies can rarely be
-  understood. With recent advances in Explainable Artificial
-  Intelligence (XAI), approaches are available to explore
-  the reasoning behind those complex models' predictions.
-  Among post-hoc attribution methods, Layer-wise Relevance
-  Propagation (LRP) shows high performance. For deeper
-  quantitative analysis, manual approaches exist, but
-  without the right tools they are unnecessarily labor
-  intensive. In this software paper, we introduce three
-  software packages targeted at scientists to explore model
-  reasoning using attribution approaches and beyond: (1)
-  Zennit - a highly customizable and intuitive attribution
-  framework implementing LRP and related approaches in
-  PyTorch, (2) CoRelAy - a framework to easily and quickly
-  construct quantitative analysis pipelines for dataset-wide
-  analyses of explanations, and (3) ViRelAy - a
-  web-application to interactively explore data,
-  attributions, and analysis results. With this, we provide
-  a standardized implementation solution for XAI, to
-  contribute towards more reproducibility in our field.
+  The predictive capabilities of Deep Neural Networks (DNNs) are
+  well-established, yet the underlying mechanisms driving these predictions
+  often remain opaque. The advent of Explainable Artificial Intelligence (XAI)
+  has introduced novel methodologies to explore the reasoning behind complex
+  model predictions of complex models. Among post-hoc attribution methods,
+  Layer-wise Relevance Propagation (LRP) has demonstrated notable adaptability
+  and performance for explaining individual predictions – provided the method
+  is used to its full potential. For deeper datasetwide and quantitative
+  analyses, however, the manual inspection of individual attribution maps
+  remains unnecessarily labor-intensive and time consuming. While several
+  approaches for dataset-wide XAI-analyses have been proposed, unified and
+  accessible implementations of such tools are still lacking. Furthermore,
+  there is a notable absence of dedicated visualization and analysis software
+  to support stakeholders in interpreting both local and global XAI results
+  effectively. This gap underscores the need for comprehensive software tools
+  that facilitate both granular and holistic understanding of model behavior,
+  as well as easing the adaptability of XAI in applications and the sciences.
+  To address these challenges, we present three software packages designed to
+  facilitate the exploration of model reasoning using attribution approaches
+  and beyond: (1) Zennit – a highly customizable and intuitive attribution
+  framework implementing LRP and related methods in PyTorch, (2) CoRelAy – a
+  framework to easily and quickly construct quantitative analysis pipelines for
+  dataset-wide analyses of explanations, and (3) ViRelAy – an interactive
+  web-application for exploring data, attributions, and analysis results. By
+  providing a standardized implementation for XAI, we aim to promote
+  reproducibility in our field and empower scientists and practitioners to
+  uncover the intricacies of complex model behavior.
 keywords:
   - Explainable Artificial Intelligence
   - XAI
