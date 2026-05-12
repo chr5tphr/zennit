@@ -17,6 +17,7 @@
 # along with this library. If not, see <https://www.gnu.org/licenses/>.
 '''Functions to produce a canonical form of models fit for LRP'''
 from abc import ABCMeta, abstractmethod
+from functools import partial
 
 import torch
 
@@ -145,7 +146,13 @@ class MergeBatchNorm(Canonizer):
         # change batch_norm parameters to produce identity
         for key, func in zip(
             ('running_mean', 'running_var', 'bias', 'weight', 'eps'),
-            (*(torch.zeros_like, torch.ones_like) * 2, lambda _: 0.)
+            (
+                torch.zeros_like,
+                partial(torch.full_like, fill_value=0.5),
+                torch.zeros_like,
+                torch.ones_like,
+                lambda _: 0.5
+            )
         ):
             object.__setattr__(batch_norm, key, func(getattr(batch_norm, key)))
 
