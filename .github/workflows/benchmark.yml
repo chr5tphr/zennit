@@ -33,7 +33,7 @@ jobs:
       - name: Prepare directories
         run: mkdir data params results
       - name: Download lighthouse data
-        run: bash share/scripts/download-lighthouses.sh --output data/lighthouses
+        run: bash share/scripts/download-lighthouses.sh --local share/img/lighthouses --output data/lighthouses
       - name: Download VGG16 model parameters
         run: curl -o params/vgg16-397923af.pth 'https://download.pytorch.org/models/vgg16-397923af.pth'
       - name: Run heatmap benchmark

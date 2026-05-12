@@ -97,14 +97,14 @@ wnids=(
 wnid="n02814860"
 
 URLS=(
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/2006_09_06_180_Leuchtturm.jpg/640px-2006_09_06_180_Leuchtturm.jpg'
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/2014_Leuchtturm_Kap_Arkona_02.jpg/320px-2014_Leuchtturm_Kap_Arkona_02.jpg'
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/2013-12-06_Orkan_Xaver_in_Warnem%C3%BCnde_12.jpg/640px-2013-12-06_Orkan_Xaver_in_Warnem%C3%BCnde_12.jpg'
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Leuchtturm_Dornbusch_2012.JPG/321px-Leuchtturm_Dornbusch_2012.JPG'
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Neuer_Leuchtturm_Arkona_2012.jpg/640px-Neuer_Leuchtturm_Arkona_2012.jpg'
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Pilsumer_Leuchtturm_2010-10_CN-I.jpg/640px-Pilsumer_Leuchtturm_2010-10_CN-I.jpg'
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Lindau_Harbor_Lake_Constance_01.jpg/640px-Lindau_Harbor_Lake_Constance_01.jpg'
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Heligoland_07-2016_photo28.jpg/640px-Heligoland_07-2016_photo28.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/2006_09_06_180_Leuchtturm.jpg/330px-2006_09_06_180_Leuchtturm.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/2014_Leuchtturm_Kap_Arkona_02.jpg/330px-2014_Leuchtturm_Kap_Arkona_02.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/2013-12-06_Orkan_Xaver_in_Warnem%C3%BCnde_12.jpg/330px-2013-12-06_Orkan_Xaver_in_Warnem%C3%BCnde_12.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Leuchtturm_Dornbusch_2012.JPG/330px-Leuchtturm_Dornbusch_2012.JPG'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Neuer_Leuchtturm_Arkona_2012.jpg/330px-Neuer_Leuchtturm_Arkona_2012.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Pilsumer_Leuchtturm_2010-10_CN-I.jpg/330px-Pilsumer_Leuchtturm_2010-10_CN-I.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Lindau_Harbor_Lake_Constance_01.jpg/330px-Lindau_Harbor_Lake_Constance_01.jpg'
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Heligoland_07-2016_photo28.jpg/330px-Heligoland_07-2016_photo28.jpg'
 )
 
 process_file() {
@@ -138,6 +138,7 @@ Requires (magic-) file and cURL.
 Available options:
 
 -o, --output    Path to store dataset (default = 'share/datasets/subimagenet')
+-l, --local     Path pre-downloaded versions of images
 -h, --help      Print this help and exit
 -v, --verbose   Print script debug info
 EOF
@@ -154,6 +155,10 @@ parse_params() {
             -v | --verbose) set -x ;;
             -o | --output)
                 output="${2-}"
+                shift
+                ;;
+            -l | --local)
+                localpath="${2-}"
                 shift
                 ;;
             -?*) die "Unknown option: ${1}" ;;
@@ -175,6 +180,12 @@ command -v curl >/dev/null || die "curl not available!" 1
 command -v file >/dev/null || die "file not available!" 1
 
 mkdir -p "${wnids[@]/#/$output/}"
+
+if [ -v localpath -a -d "$localpath" ]; then
+    cp "$localpath"/*.jpeg "${output}/${wnid}/"
+    echo "Copied existing files from \"$localpath\""
+    exit 0
+fi
 
 echo -n "Downloading: "
 n_loaded=0
