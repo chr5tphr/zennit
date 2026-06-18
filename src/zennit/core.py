@@ -456,7 +456,70 @@ class Identity(torch.autograd.Function):
         return grad_outputs
 
 
-class Hook:
+class HookBase:
+    '''Base for Hook functionality. Every hook must implement this interface.'''
+    def register(self, module):
+        '''Attach this hook to a module. This modifies forward/backward computations. Returns a handle which can be
+        used to call this Hook's ``.remove``.
+        '''
+        return RemovableHandle(self)
+
+    def remove(self):
+        '''Remove this hook. Removes all references and modifications it introduced.'''
+
+    def copy(self):
+        '''Return a copy of this hook.
+        This is used to describe hooks of different modules by a single hook instance.
+        '''
+        return self.__class__()
+
+
+class GradOutHook(HookBase):
+    '''Hook to only modify the output gradient of a module. This leaves the gradient computation of the module intact.
+    '''
+    def post_forward(self, module, input, output):
+        '''Register a backward-hook to the resulting tensor right after the forward.'''
+        hook_ref = weakref.ref(self)
+
+        @functools.wraps(self.backward)
+        def wrapper(grad_input, grad_output):
+            hook = hook_ref()
+            if hook is not None and hook.active:
+                return hook.backward(module, grad_output)
+            return None
+
+        if not isinstance(output, tuple):
+            output = (output,)
+
+        # only if gradient required
+        if output[0].grad_fn is not None:
+            # add identity to ensure .grad_fn exists
+            post_output = Identity.apply(*output)
+            # register the input tensor gradient hook
+            self.tensor_handles.append(
+                post_output[0].grad_fn.register_hook(wrapper)
+            )
+            # work around to support in-place operations
+            post_output = tuple(elem.clone() for elem in post_output)
+        else:
+            # no gradient required
+            post_output = output
+        return post_output[0] if len(post_output) == 1 else post_output
+
+    def backward(self, module, grad_output):
+        '''Hook applied during backward-pass. Modifies the output gradient of module before its gradient
+        computation.
+        '''
+
+    def register(self, module):
+        '''Register this instance by registering the neccessary forward hook to the supplied module.'''
+        return RemovableHandleList([
+            RemovableHandle(self),
+            module.register_forward_hook(self.post_forward),
+        ])
+
+
+class Hook(HookBase):
     '''Base class for hooks to be used to compute layer-wise attributions.'''
     def __init__(self):
         self.stored_tensors = {}
@@ -932,11 +995,17 @@ class Composite:
 
         ctx = {}
         for name, child in module.named_modules():
-            template = self.module_map(ctx, name, child)
-            if template is not None:
-                hook = template.copy()
-                self.hook_refs.add(hook)
-                self.handles.append(hook.register(child))
+            templates = self.module_map(ctx, name, child)
+            try:
+                templates = iter(template)
+            else:
+                templates = (template,)
+
+            for template in templates:
+                if template is not None:
+                    hook = template.copy()
+                    self.hook_refs.add(hook)
+                    self.handles.append(hook.register(child))
 
     def remove(self):
         '''Remove all handles for hooks and canonizers.

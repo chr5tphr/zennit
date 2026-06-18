@@ -141,8 +141,7 @@ class NameMapComposite(Composite):
         '''
         return next((hook for names, hook in self.name_map if name in names), None)
 
-
-class MixedComposite(Composite):
+class MultiComposite(Composite):
     '''A Composite for which hooks are specified by a list of composites.
 
     Each composite defines a mapping from layer property to a specific Hook.
@@ -190,7 +189,44 @@ class MixedComposite(Composite):
         hooks = [composite.module_map(ctx[composite], name, module) for composite in self.composites]
 
         # return first hook that is not None, if there isn't any, return None
+        return self.handle_hooks(hooks)
+
+    def handle_hooks(self, hooks):
+        raise NotImplementedError()
+
+
+class MixedComposite(Composite):
+    '''A Composite for which hooks are specified by a list of composites.
+
+    Each composite defines a mapping from layer property to a specific Hook.
+    The list order of composites defines their matching order.
+
+    Parameters
+    ----------
+    composites: `list[Composite]`
+        A list of Composites. The list order of composites defines their matching order.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
+    '''
+    def handle_hooks(self, hooks):
         return next((hook for hook in hooks if hook is not None), None)
+
+
+class MergedComposite(Composite):
+    '''A Composite for which hooks are specified by a list of composites.
+
+    Each composite defines a mapping from layer property to a specific Hook.
+    The list order of composites defines their matching order.
+
+    Parameters
+    ----------
+    composites: `list[Composite]`
+        A list of Composites. The list order of composites defines their matching order.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
+    '''
+    def handle_hooks(self, hooks):
+        return tuple(hook for hook in hooks if hook is not None) or None
 
 
 class NameLayerMapComposite(MixedComposite):
