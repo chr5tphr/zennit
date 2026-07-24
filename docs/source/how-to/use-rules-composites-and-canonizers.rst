@@ -39,6 +39,9 @@ normal gradient computation. All available built-in rules can be found in
   without changing it
 * :py:class:`~zennit.rules.Flat`, a rule meant for linear (dense, convolutional)
   layers to equally distribute relevance as if inputs and weights were constant
+* :py:class:`~zennit.rules.SIGN`, an LRP rule for the first linear (dense,
+  convolutional) layer to redistribute relevance only by the sign of the input
+  instead by the magnitude *and* sign of the input
 
 Rules can be instantiated, after which they may be used directly:
 
@@ -204,6 +207,10 @@ attribution methods, some of which are
   :py:class:`~zennit.rules.Epsilon` for dense linear layers, and
   :py:class:`~zennit.rules.ZBox` for the first linear (dense, convolutional)
   layer
+* :py:class:`~zennit.composites.EpsilonSIGNComposite`, which uses
+  :py:class:`~zennit.rules.Epsilon` for convolutional and dense linear layers,
+  and :py:class:`~zennit.rules.SIGN` for the first linear (dense,
+  convolutional) layer
 * :py:class:`~zennit.composites.GuidedBackprop`, which implements Guided
   Backpropagation by using the :py:class:`~zennit.rules.GuidedBackprop` rule
   for all ReLUs

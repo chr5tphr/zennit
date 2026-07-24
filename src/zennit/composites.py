@@ -20,7 +20,7 @@ import torch
 
 from .core import Composite
 from .layer import Sum
-from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm
+from .rules import Gamma, Epsilon, ZBox, ZPlus, AlphaBeta, Flat, Pass, Norm, SIGN
 from .rules import ReLUDeconvNet, ReLUGuidedBackprop, ReLUBetaSmooth
 from .types import Convolution, Linear, AvgPool, Activation, BatchNorm
 
@@ -602,3 +602,53 @@ class BetaSmooth(LayerMapComposite):
             (torch.nn.ReLU, ReLUBetaSmooth(beta_smooth=beta_smooth)),
         ]
         super().__init__(layer_map=layer_map, canonizers=canonizers)
+
+
+@register_composite('epsilon_sign')
+class EpsilonSIGNComposite(SpecialFirstLayerMapComposite):
+    '''An explicit composite using the SIGN rule :cite:p:`gumpfer2023sign` for any linear first layer and the epsilon
+    rule for all other convolutional and fully connected layers. The SIGN rule was developed for time series data and
+     images with very high or very low contrast :cite:p:`gumpfer2023sign,gumpfer2024trustworthy`.
+
+    Parameters
+    ----------
+    mu: float, optional
+        Separation threshold for the ``SIGN`` rule, usually the expected value of the input distribution. For
+        zero-centered inputs, which is the common case, ``mu=0.`` is appropriate.
+    epsilon: callable or float, optional
+        Stabilization parameter for the ``Epsilon`` rule. If ``epsilon`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator. Note that this is
+        called ``stabilizer`` for all other rules.
+    stabilizer: callable or float, optional
+        Stabilization parameter for rules other than ``Epsilon``. If ``stabilizer`` is a float, it will be added to the
+        denominator with the same sign as each respective entry. If it is callable, a function ``(input: torch.Tensor)
+        -> torch.Tensor`` is expected, of which the output corresponds to the stabilized denominator.
+    layer_map: list[tuple[tuple[torch.nn.Module, ...], Hook]]
+        A mapping as a list of tuples, with a tuple of applicable module types and a Hook. This will be prepended to
+        the ``layer_map`` defined by the composite.
+    first_map: `list[tuple[tuple[torch.nn.Module, ...], Hook]]`
+        Applicable mapping for the first layer, same format as `layer_map`. This will be prepended to the ``first_map``
+        defined by the composite.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
+    canonizers: list[:py:class:`zennit.canonizers.Canonizer`], optional
+        List of canonizer instances to be applied before applying hooks.
+    '''
+    def __init__(
+        self, mu=0., epsilon=1e-6, stabilizer=1e-6, layer_map=None, first_map=None, zero_params=None, canonizers=None
+    ):
+        if layer_map is None:
+            layer_map = []
+        if first_map is None:
+            first_map = []
+
+        rule_kwargs = {'zero_params': zero_params}
+        layer_map = layer_map + layer_map_base(stabilizer) + [
+            (Convolution, Epsilon(epsilon=epsilon, **rule_kwargs)),
+            (torch.nn.Linear, Epsilon(epsilon=epsilon, **rule_kwargs)),
+        ]
+        first_map = first_map + [
+            (Linear, SIGN(mu=mu, stabilizer=stabilizer, **rule_kwargs))
+        ]
+        super().__init__(layer_map=layer_map, first_map=first_map, canonizers=canonizers)
