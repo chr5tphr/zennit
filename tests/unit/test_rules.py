@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import pytest
 import torch
-from zennit.rules import Epsilon, ZPlus, AlphaBeta, Gamma, ZBox, Norm, WSquare, Flat
+from zennit.rules import Epsilon, ZPlus, AlphaBeta, Gamma, ZBox, Norm, WSquare, Flat, SIGN
 from zennit.rules import Pass, ReLUDeconvNet, ReLUGuidedBackprop, ReLUBetaSmooth
 from zennit.rules import zero_bias as name_zero_bias
 
@@ -203,6 +203,20 @@ def rule_flat(wflat, bias, input, relevance):
     zval = torch.ones_like(input) @ wflat.t()
     rfac = relevance / stabilize(zval)
     return rfac @ wflat
+
+
+@replicates(RULES_LINEAR, SIGN)
+@replicates(RULES_LINEAR, SIGN, zero_params='bias')
+@replicates(RULES_LINEAR, SIGN, mu=-0.5)
+@replicates(RULES_LINEAR, SIGN, mu=-0.5, zero_params='bias')
+@replicates(RULES_LINEAR, SIGN, mu=0.5)
+@replicates(RULES_LINEAR, SIGN, mu=0.5, zero_params='bias')
+@matrix_form
+def rule_sign(weight, bias, input, relevance, mu=0., zero_params=None):
+    '''Replicates the SIGN rule.'''
+    bias = zero_bias(zero_params, bias)
+    sign = torch.where(input < mu, -torch.ones_like(input), torch.ones_like(input))
+    return sign * ((relevance / stabilize(input @ weight.t() + bias)) @ weight)
 
 
 @replicates(RULES_SIMPLE, Pass)

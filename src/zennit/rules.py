@@ -524,3 +524,38 @@ class ReLUBetaSmooth(Hook):
             The modified `grad_output`.
         '''
         return (torch.sigmoid(self.beta_smooth * self.stored_tensors['input'][0]) * grad_output[0],)
+
+
+class SIGN(BasicHook):
+    '''LRP SIGN rule :cite:p:`gumpfer2023sign`.
+    It is intended to be used in the first layer in order to reduce input-multiplication bias and rely on
+    sign-based adjustments only. This removes the input-magnitude bias of the input-multiplication, and was found to
+    improve attributions for the first layer of models on time series data :cite:p:`gumpfer2024trustworthy` and on
+    images with very high or very low contrast :cite:p:`gumpfer2023sign`.
+
+    Parameters
+    ----------
+    mu: float, optional
+        Separation threshold, usually the expected value of the input distribution. For zero-centered inputs, which is
+        the common case, ``mu=0.`` is appropriate.
+    stabilizer: callable or float, optional
+        Stabilization parameter. If ``stabilizer`` is a float, it will be added to the denominator with the same sign
+        as each respective entry. If it is callable, a function ``(input: torch.Tensor) -> torch.Tensor`` is expected,
+        of which the output corresponds to the stabilized denominator.
+    zero_params: list[str], optional
+        A list of parameter names that shall set to zero. If `None` (default), no parameters are set to zero.
+    '''
+    def __init__(self, mu=0., stabilizer=1e-6, zero_params=None):
+        stabilizer_fn = Stabilizer.ensure(stabilizer)
+        super().__init__(
+            input_modifiers=[lambda input: input],
+            param_modifiers=[NoMod(zero_params=zero_params)],
+            output_modifiers=[lambda output: output],
+            gradient_mapper=(lambda out_grad, outputs: out_grad / stabilizer_fn(outputs[0])),
+            reducer=(lambda inputs,
+                            gradients: torch.where(inputs[0] < mu,
+                                                   -torch.ones_like(inputs[0]),
+                                                   torch.ones_like(inputs[0])
+                                                   ) * gradients[0]
+                     ),
+        )
